@@ -42,4 +42,50 @@ class SrtSubtitleParserTests {
             parser.parse("1\n00:00:01,000 --> 00:00:02,000\n")
         }
     }
+
+    @Test
+    fun `rejects empty content and content with no cues`() {
+        assertThrows(InvalidSubtitleException::class.java) { parser.parse("") }
+        assertThrows(InvalidSubtitleException::class.java) { parser.parse("\n  \n") }
+    }
+
+    @Test
+    fun `rejects an invalid cue number`() {
+        assertThrows(InvalidSubtitleException::class.java) {
+            parser.parse("zero\n00:00:01,000 --> 00:00:02,000\nHello")
+        }
+    }
+
+    @Test
+    fun `rejects a cue with no timing line`() {
+        assertThrows(InvalidSubtitleException::class.java) { parser.parse("1") }
+    }
+
+    @Test
+    fun `rejects clock values with minutes or seconds above 59`() {
+        val invalidTimings = listOf(
+            "00:60:00,000 --> 00:61:00,000",
+            "00:00:60,000 --> 00:01:01,000",
+        )
+
+        invalidTimings.forEach { timing ->
+            assertThrows(InvalidSubtitleException::class.java) {
+                parser.parse("1\n$timing\nHello")
+            }
+        }
+    }
+
+    @Test
+    fun `rejects cue end times equal to or before start time`() {
+        val invalidTimings = listOf(
+            "00:00:01,000 --> 00:00:01,000",
+            "00:00:02,000 --> 00:00:01,000",
+        )
+
+        invalidTimings.forEach { timing ->
+            assertThrows(InvalidSubtitleException::class.java) {
+                parser.parse("1\n$timing\nHello")
+            }
+        }
+    }
 }
