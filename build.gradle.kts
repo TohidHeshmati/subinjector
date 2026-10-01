@@ -19,8 +19,10 @@ repositories {
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.1"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.ai:spring-ai-model")
     implementation(kotlin("reflect"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -16,9 +16,9 @@ Subinjector is a Kotlin Spring Boot application built with Gradle Kotlin DSL. Th
 
 ## AI provider direction
 
-The AI integration now has a provider-neutral `LanguageModel` port and an `OllamaLanguageModelAdapter` implementation. Spring selects the available implementation at application startup; Ollama is the only provider currently registered. The adapter calls the local `/api/chat` endpoint, configured by `OLLAMA_BASE_URL` and `OLLAMA_MODEL`, and returns assistant text. See [ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md) and [specification 0004](specs/0004-ollama-provider-adapter.md).
+The AI integration has a provider-neutral `LanguageModel` port and an `OllamaLanguageModelAdapter` implementation. Spring selects the available implementation at application startup; Ollama is the only provider currently registered. The adapter calls the local `/api/chat` endpoint, configured by `OLLAMA_BASE_URL` and `OLLAMA_MODEL`, and returns assistant text. A one-cue enrichment use case builds a German-specific prompt from a Markdown classpath resource using Spring AI `PromptTemplate`, uses neighboring cues as context, and validates a concise structured result. The HTTP upload flow does not call enrichment yet. See [ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md), [ADR-004](adr/ADR-004-language-specific-enrichment-prompts.md), and [specifications 0004](specs/0004-ollama-provider-adapter.md) and [0005](specs/0005-single-cue-enrichment.md).
 
-Ollama with `qwen3:0.6b` has been called manually through its local API, and an opt-in application smoke test is available for verifying the configured adapter against a running local service. This is provider connectivity only: no subtitle prompt, enrichment behavior, structured result contract, or cloud provider is implemented or selected.
+Ollama with `qwen3:0.6b` can be exercised through an opt-in smoke test that enriches one German cue. Enrichment output is parsed and validated in the application; native provider-constrained JSON Schema is not yet used. No cloud provider is selected.
 
 ## Guiding principles
 
