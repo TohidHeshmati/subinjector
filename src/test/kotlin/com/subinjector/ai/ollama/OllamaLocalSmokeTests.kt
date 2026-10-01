@@ -15,6 +15,6 @@ class OllamaLocalSmokeTests {
 
     @Test
     fun `generates a response through the configured local Ollama model`() {
-        assertEquals("LOCAL_OK", languageModel.generate("Reply with exactly LOCAL_OK"))
+        assertEquals("LOCAL_OK", languageModel.generate("Reply with exactly LOCAL_OK", maxOutputTokens = 32))
     }
 }

@@ -12,6 +12,7 @@ Subinjector is expected to use a local model first and may later support cloud o
 - Keep provider-specific communication behind an application-facing port that describes the capability the application needs, without exposing Ollama-specific request or response types.
 - Implement the first provider as an Ollama adapter that translates between the application port and Ollama's local HTTP API.
 - Treat provider adapters as interchangeable strategies for fulfilling that port. Select the configured implementation at application startup; do not add a runtime provider registry or user-facing provider selection until a requirement justifies it.
+- Require each generation request to provide a positive maximum output-token count. The Ollama adapter maps it to `options.num_predict`; the one-cue enrichment use case currently sets the ceiling to 512 tokens.
 - Parse and validate provider output at the application boundary before treating it as trusted domain data.
 - Keep prompts, response contracts, and provider transport concerns separately understandable; define the concrete enrichment contract in a feature specification before implementing it.
 - Do not silently fall back to a cloud provider when local-only operation is selected.
@@ -24,7 +25,7 @@ Subinjector is expected to use a local model first and may later support cloud o
 
 ## Consequences
 
-The initial integration will have a small application port and one Ollama adapter, which can be tested independently from provider-independent use-case behavior. Adding another provider will require an adapter and verification of whether it can satisfy the same port. The port must represent actual shared requirements rather than force providers into unsupported capabilities. This decision does not select a final prompt format, enrichment response schema, output language, or user-facing provider configuration.
+The initial integration will have a small application port and one Ollama adapter, which can be tested independently from provider-independent use-case behavior. The port includes a provider-side output ceiling, so adapters must map it to their provider's supported setting. Adding another provider will require an adapter and verification of whether it can satisfy the same port. The port must represent actual shared requirements rather than force providers into unsupported capabilities. This decision does not select a final prompt format, enrichment response schema, output language, or user-facing provider configuration.
 
 ## Revisit conditions
 
