@@ -34,3 +34,4 @@ Name each work branch `NNNN-type-short-title`, using a four-digit, zero-padded w
 16. Prefer deterministic tests over tests that require live LLM calls.
 17. Treat AI output as untrusted input that must be validated.
 18. Never silently send data to a cloud AI provider when a local-only mode is requested.
+19. Organize application code by feature under `com.subinjector`; keep each public top-level type in its own matching file. Add role-based subpackages only when the feature has clear, distinct responsibilities that need them.

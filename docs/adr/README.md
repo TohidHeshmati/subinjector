@@ -31,4 +31,6 @@ What are the positive and negative consequences of this decision? What limitatio
 Under what circumstances should we reconsider this decision?
 ```
 
-No ADRs have been recorded yet.
+## Recorded decisions
+
+- [ADR-001: Package organization](ADR-001-package-organization.md)

@@ -20,9 +20,11 @@ repositories {
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
     implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation(kotlin("reflect"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 }
 
 kotlin {
