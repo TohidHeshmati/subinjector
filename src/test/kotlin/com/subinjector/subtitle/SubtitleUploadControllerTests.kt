@@ -37,4 +37,20 @@ class SubtitleUploadControllerTests {
         mockMvc.perform(multipart("/api/subtitles/upload").file(file))
             .andExpect(status().isBadRequest)
     }
+
+    @Test
+    fun `rejects an empty SRT upload`() {
+        val file = MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf())
+
+        mockMvc.perform(multipart("/api/subtitles/upload").file(file))
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `rejects an SRT upload with no cues`() {
+        val file = MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray())
+
+        mockMvc.perform(multipart("/api/subtitles/upload").file(file))
+            .andExpect(status().isBadRequest)
+    }
 }
