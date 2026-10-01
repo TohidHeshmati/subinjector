@@ -34,6 +34,13 @@ From the project root:
 ./gradlew bootRun
 ```
 
-Windows users can use `gradlew.bat` when it is generated alongside the wrapper. The initial application starts without providing product endpoints or business behavior.
+The foundation exposes one introductory endpoint:
+
+```bash
+curl http://localhost:8080/api/hello
+# {"message":"Hello, world!"}
+```
+
+Windows users can use `gradlew.bat`. No subtitle-learning functionality is implemented yet.
 
 Features will be added incrementally, with requirements and design decisions documented as they are established.

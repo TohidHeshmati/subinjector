@@ -2,7 +2,7 @@
 
 ## Initial foundation
 
-The repository starts as a minimal Kotlin application on Spring Boot, built with Gradle Kotlin DSL. It contains an application entry point and a smoke test that checks Spring can create the application context. No product behavior or infrastructure has been added.
+The repository starts as a minimal Kotlin application on Spring Boot, built with Gradle Kotlin DSL. It contains an application entry point, a single introductory REST endpoint, and tests for the endpoint and application context. No subtitle-learning behavior or supporting infrastructure has been added.
 
 ## Current choices
 
