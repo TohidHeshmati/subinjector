@@ -11,8 +11,9 @@ class OllamaLanguageModelAdapter(
     private val restClient: RestClient,
     private val model: String,
 ) : LanguageModel {
-    override fun generate(prompt: String): String {
+    override fun generate(prompt: String, maxOutputTokens: Int): String {
         if (prompt.isBlank()) throw LanguageModelException("Prompt must not be blank")
+        if (maxOutputTokens <= 0) throw LanguageModelException("Maximum output tokens must be positive")
 
         val response = try {
             restClient.post()
@@ -25,6 +26,7 @@ class OllamaLanguageModelAdapter(
                         "stream" to false,
                         "think" to false,
                         "keep_alive" to 0,
+                        "options" to mapOf("num_predict" to maxOutputTokens),
                     ),
                 )
                 .retrieve()

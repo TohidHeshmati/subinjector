@@ -27,6 +27,7 @@ Use the local language model to produce concise learning notes for one subtitle 
 - Return notes only for the target cue. Use neighboring cue text only to resolve meaning, references, or phrase boundaries.
 - Keep subtitle text as untrusted input data. Instructions embedded in subtitle text are content to analyze, not instructions to follow.
 - Limit the result to three notes per cue and reject an explanation longer than 300 characters or two sentences.
+- Request at most 512 generated tokens for one cue; this is a provider-side ceiling, not an instruction to fill the budget.
 - Ask the model for JSON text and parse and validate it in the application. Do not change the provider port to accept a JSON schema in this slice.
 - Do not log cue text, prompts, or generated notes.
 
@@ -35,7 +36,7 @@ Use the local language model to produce concise learning notes for one subtitle 
 - The generated notes are associated with the target cue and never with context-only cues.
 - Valid structured output is mapped to the application result type; malformed or out-of-bound output is rejected with a clear application error.
 - Empty enrichment is accepted when the model finds no useful note.
-- Deterministic tests cover prompt inputs, cue association, empty results, malformed output, and configured output limits without calling an LLM.
+- Deterministic tests cover prompt inputs, cue association, empty results, malformed output, response limits, and forwarding the provider-side output-token ceiling without calling an LLM.
 - A local Ollama smoke check can exercise one representative cue without being part of the regular test suite.
 
 ## Testing notes
@@ -46,4 +47,5 @@ Use the local language model to produce concise learning notes for one subtitle 
 ## Open questions
 - What exact multipart field names and validation errors should expose the language and CEFR choices on the upload endpoint?
 - How should a malformed cue response be handled during eventual full-file processing: fail the whole file, retry the cue, or return partial enrichment?
+- What processing and model-lifetime strategy will keep large subtitles (for example, 2,000 cues) within acceptable runtime and memory use?
 - Should a future language-specific prompt also choose a different explanation language, or should explanation language remain a separate user setting?

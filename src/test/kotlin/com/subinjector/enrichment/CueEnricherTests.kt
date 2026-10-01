@@ -26,6 +26,7 @@ class CueEnricherTests {
         val result = enricher.enrich(request())
 
         assertEquals(12, result.cueNumber)
+        assertEquals(512, model.lastMaxOutputTokens)
         assertEquals(
             listOf(EnrichmentNote(EnrichmentCategory.IDIOM, "Bahnhof verstehen", "It means not to understand what is being said.")),
             result.notes,
@@ -257,9 +258,12 @@ class CueEnricherTests {
     private class StubLanguageModel(private val response: String) : LanguageModel {
         var lastPrompt: String? = null
             private set
+        var lastMaxOutputTokens: Int? = null
+            private set
 
-        override fun generate(prompt: String): String {
+        override fun generate(prompt: String, maxOutputTokens: Int): String {
             lastPrompt = prompt
+            lastMaxOutputTokens = maxOutputTokens
             return response
         }
     }
