@@ -24,3 +24,6 @@ Thumbs.db
 # Logs
 *.log
 
+# Local subtitle files used for manual parsing checks
+local-test-data/subtitles/*.srt
+local-test-data/subtitles/*.SRT
