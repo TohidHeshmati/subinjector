@@ -1,4 +1,4 @@
-package com.subinjector
+package com.subinjector.hello
 
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,7 +16,8 @@ class HelloControllerTests {
 
     @Test
     fun `returns a JSON greeting`() {
-        mockMvc.perform(get("/api/hello"))
+        mockMvc
+            .perform(get("/api/hello"))
             .andExpect(status().isOk)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(content().string("""{"message":"Hello, world!"}"""))
