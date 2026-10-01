@@ -12,6 +12,12 @@ Subinjector is a personal project exploring an AI-assisted way to learn language
 - Learn practical AI engineering, testing, and reliable system design as the project needs them.
 - Keep the code understandable and build the portfolio project through small increments.
 
+## Development workflow
+
+Work in short iterations: record a consequential product or architecture decision when one is actually made, write a small feature specification, implement one reviewable slice, run focused tests and verification, review the change for understanding, then commit it on a branch and submit it through a pull request. Add a learning note only when there is a concrete lesson from the work.
+
+AI assistance should stay within one small implementation slice at a time. The project owner reviews the result before work moves to the next slice. ADRs capture real decisions; they are not a place for speculative future choices. See [the AI contribution guide](CONTRIBUTING_AI.md) for the branch naming convention, and see [the specification guide](docs/specs/README.md), [ADR guide](docs/adr/README.md), and [learning notes guide](docs/learnings/README.md).
+
 ## Requirements
 
 - Java 21 (LTS)
