@@ -4,22 +4,31 @@ An Architecture Decision Record (ADR) captures an important technical or archite
 
 Write an ADR when a decision has meaningful long-term effects, constrains later work, or involves trade-offs that would otherwise be easy to forget. Routine implementation details do not need an ADR.
 
-## Minimal template
+## Template
 
 ```markdown
-# ADR NNNN: Decision title
+# ADR-XXX: [Decision title]
 
-- Status: proposed | accepted | superseded
-- Date: YYYY-MM-DD
+* **Status:** Proposed | Accepted | Superseded | Deprecated
+* **Date:** YYYY-MM-DD
 
 ## Context
-What problem or choice prompted this decision?
+What problem are we trying to solve? What constraints, requirements, or trade-offs matter?
 
 ## Decision
-What are we choosing?
+What have we decided?
+
+## Alternatives considered
+
+* **Option A:** Description, benefits, and drawbacks.
+* **Option B:** Description, benefits, and drawbacks.
 
 ## Consequences
-What trade-offs or follow-up effects should readers know about?
+What are the positive and negative consequences of this decision? What limitations or future costs does it introduce?
+
+## Revisit conditions
+
+Under what circumstances should we reconsider this decision?
 ```
 
 No ADRs have been recorded yet.
