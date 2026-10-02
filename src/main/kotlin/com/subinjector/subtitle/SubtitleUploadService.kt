@@ -1,9 +1,8 @@
 package com.subinjector.subtitle
 
 import com.subinjector.enrichment.CefrLevel
-import com.subinjector.enrichment.CueEnrichmentStatus
+import com.subinjector.enrichment.EnrichmentJobStore
 import com.subinjector.enrichment.LearningLanguage
-import com.subinjector.enrichment.SubtitleEnrichmentService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
@@ -11,7 +10,7 @@ import java.nio.charset.StandardCharsets
 @Service
 class SubtitleUploadService(
     private val subtitleParser: SubtitleParser,
-    private val subtitleEnrichmentService: SubtitleEnrichmentService,
+    private val enrichmentJobStore: EnrichmentJobStore,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -41,12 +40,12 @@ class SubtitleUploadService(
             lastEntry.endTime,
             elapsedMillis,
         )
-        val enrichedCues = subtitleEnrichmentService.enrich(entries, learningLanguage, learnerLevel)
+        val submission = enrichmentJobStore.createDocument(filename, entries, learningLanguage, learnerLevel)
         return SubtitleUploadResponse(
+            documentId = submission.documentId,
+            jobId = submission.jobId,
+            status = submission.status,
             cueCount = entries.size,
-            succeededCueCount = enrichedCues.count { it.status == CueEnrichmentStatus.SUCCEEDED },
-            skippedCueCount = enrichedCues.count { it.status == CueEnrichmentStatus.SKIPPED },
-            cues = enrichedCues,
         )
     }
 }

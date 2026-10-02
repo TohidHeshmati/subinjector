@@ -3,6 +3,9 @@ package com.subinjector.subtitle
 import com.subinjector.enrichment.CefrLevel
 import com.subinjector.enrichment.LearningLanguage
 import org.springframework.http.MediaType
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -17,10 +20,15 @@ class SubtitleUploadController(private val subtitleUploadService: SubtitleUpload
         @RequestParam("file") file: MultipartFile,
         @RequestParam("learningLanguage") learningLanguage: LearningLanguage,
         @RequestParam("learnerLevel") learnerLevel: CefrLevel,
-    ): SubtitleUploadResponse = subtitleUploadService.upload(
-        filename = file.originalFilename,
-        content = file.bytes,
-        learningLanguage = learningLanguage,
-        learnerLevel = learnerLevel,
-    )
+    ): ResponseEntity<SubtitleUploadResponse> {
+        val response = subtitleUploadService.upload(
+            filename = file.originalFilename,
+            content = file.bytes,
+            learningLanguage = learningLanguage,
+            learnerLevel = learnerLevel,
+        )
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+            .header(HttpHeaders.LOCATION, "/api/enrichment-jobs/${response.jobId}")
+            .body(response)
+    }
 }

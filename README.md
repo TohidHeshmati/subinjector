@@ -4,7 +4,7 @@ Subinjector is a personal project exploring an AI-assisted way to learn language
 
 ## Status
 
-**Early development.** The application can parse an uploaded SRT file, enrich cues sequentially with a configured local Ollama model, and return each original cue with its enrichment status and notes. The current upload flow is synchronous. VTT support, contextual cue grouping, and subtitle/glossary exports are not implemented yet.
+**Early development.** The application accepts an SRT upload, saves its parsed cues and enrichment job in PostgreSQL, then enriches cues sequentially with the configured local Ollama model. Upload returns a job ID; clients can poll job progress and retrieve cue results. VTT support, contextual cue grouping, and subtitle/glossary exports are not implemented yet.
 
 ## Intended subtitle-learning flow
 
@@ -16,14 +16,14 @@ flowchart TD
     B["Validate file and subtitle data<br/>SRT structure and timestamps supported<br/>Strict encoding and size policies to define"]
     C["Parse into timed subtitle cues<br/>SRT supported"]
     D["Build contextual blocks<br/>Adjacent cue context supported<br/>Grouping related cues planned"]
-    E["Enrich with an LLM<br/>Sequential local Ollama requests supported"]
+    E["Enrich with an LLM<br/>Sequential local Ollama worker supported"]
     F["Validate and attach results<br/>JSON shape, cue reference, and note limits checked"]
     G["Export enriched subtitles<br/>SRT/VTT and separate glossary planned"]
 
     A --> B --> C --> D --> E --> F --> G
 ```
 
-Today, the upload API returns the original SRT cues and their enrichment as JSON. The later export step will produce downloadable subtitle and glossary files.
+Today, upload returns `202 Accepted` with document and job IDs. Poll the job endpoint for progress, then retrieve ordered cue outcomes from the results endpoint. The later export step will produce downloadable subtitle and glossary files.
 
 ## Development goals
 
@@ -66,5 +66,14 @@ The foundation exposes one introductory endpoint:
 curl http://localhost:8080/api/hello
 # {"message":"Hello, world!"}
 ```
+
+Subtitle enrichment is asynchronous. Upload an SRT with the selected learning language and CEFR level:
+
+```bash
+curl -i -F 'file=@lesson.srt' -F 'learningLanguage=GERMAN' -F 'learnerLevel=B1' \
+  http://localhost:8080/api/subtitles/upload
+```
+
+Use the returned `jobId` with `GET /api/enrichment-jobs/{jobId}` to check progress and `GET /api/enrichment-jobs/{jobId}/results` to retrieve available cue outcomes. A later run can reuse stored cues through `POST /api/subtitle-documents/{documentId}/enrichment-jobs` with the same language and level form parameters.
 
 Features will be added incrementally, with requirements and design decisions documented as they are established.
