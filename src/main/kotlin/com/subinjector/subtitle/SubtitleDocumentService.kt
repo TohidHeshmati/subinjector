@@ -27,20 +27,20 @@ class SubtitleDocumentService(
         }
 
         val startedAt = System.nanoTime()
-        val entries = subtitleParser.parse(String(content, StandardCharsets.UTF_8))
+        val cues = subtitleParser.parse(String(content, StandardCharsets.UTF_8))
         val elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000
-        val firstEntry = entries.first()
-        val lastEntry = entries.last()
+        val firstCue = cues.first()
+        val lastCue = cues.last()
         logger.info(
-            "Parsed SRT upload: bytes={}, entries={}, sequenceRange={}..{}, timelineRange={}..{}, elapsedMs={}",
+            "Parsed SRT upload: bytes={}, cues={}, sequenceRange={}..{}, timelineRange={}..{}, elapsedMs={}",
             content.size,
-            entries.size,
-            firstEntry.sequenceNumber,
-            lastEntry.sequenceNumber,
-            firstEntry.startTime,
-            lastEntry.endTime,
+            cues.size,
+            firstCue.sequenceNumber,
+            lastCue.sequenceNumber,
+            firstCue.startMs,
+            lastCue.endMs,
             elapsedMillis,
         )
-        return enrichmentJobService.createDocument(filename, entries, learningLanguage, learnerLevel)
+        return enrichmentJobService.createDocument(filename, cues, learningLanguage, learnerLevel)
     }
 }

@@ -1,8 +1,8 @@
 package com.subinjector.subtitle
 
-data class SubtitleEntry(
+data class SubtitleCue(
     val sequenceNumber: Int,
-    val startTime: String,
-    val endTime: String,
+    val startMs: Int,
+    val endMs: Int,
     val text: String,
 )

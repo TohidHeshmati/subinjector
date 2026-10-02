@@ -23,8 +23,8 @@ class SrtSubtitleParserTests {
         val cues = parser.parse(content)
 
         assertEquals(2, cues.size)
-        assertEquals(SubtitleEntry(1, "00:00:01,000", "00:00:02,500", "Guten Morgen.\nWie geht's?"), cues[0])
-        assertEquals(SubtitleEntry(2, "00:00:03,000", "00:00:04,000", "Auf Wiedersehen."), cues[1])
+        assertEquals(SubtitleCue(1, 1_000, 2_500, "Guten Morgen.\nWie geht's?"), cues[0])
+        assertEquals(SubtitleCue(2, 3_000, 4_000, "Auf Wiedersehen."), cues[1])
     }
 
     @Test

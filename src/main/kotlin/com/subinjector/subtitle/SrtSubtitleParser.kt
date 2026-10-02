@@ -4,13 +4,13 @@ import org.springframework.stereotype.Component
 
 @Component
 class SrtSubtitleParser : SubtitleParser {
-    override fun parse(content: String): List<SubtitleEntry> = SrtParsingSession(content).parse()
+    override fun parse(content: String): List<SubtitleCue> = SrtParsingSession(content).parse()
 }
 
 /** Keeps state local to one parse call; all format-specific parsing rules live here. */
 private class SrtParsingSession(content: String) {
     private val lines = content.removePrefix("\uFEFF").lineSequence().toList()
-    private val entries = mutableListOf<SubtitleEntry>()
+    private val entries = mutableListOf<SubtitleCue>()
     private val textLines = mutableListOf<String>()
 
     private var state = ParseState.SEQUENCE_NUMBER
@@ -18,7 +18,7 @@ private class SrtParsingSession(content: String) {
     private var timing: CueTiming? = null
     private var lineIndex = 0
 
-    fun parse(): List<SubtitleEntry> {
+    fun parse(): List<SubtitleCue> {
         while (lineIndex < lines.size) {
             val line = lines[lineIndex]
             if (state == ParseState.SEQUENCE_NUMBER && line.isBlank()) {
@@ -63,10 +63,10 @@ private class SrtParsingSession(content: String) {
         val cueTiming = timing ?: throw InvalidSubtitleException("Cue $sequenceNumber is missing its timing line")
         if (textLines.isEmpty()) throw InvalidSubtitleException("Cue $sequenceNumber has no subtitle text")
 
-        entries += SubtitleEntry(
+        entries += SubtitleCue(
             sequenceNumber = sequenceNumber ?: throw InvalidSubtitleException("Cue is missing its number"),
-            startTime = cueTiming.start,
-            endTime = cueTiming.end,
+            startMs = cueTiming.startMs,
+            endMs = cueTiming.endMs,
             text = textLines.joinToString("\n"),
         )
         sequenceNumber = null
@@ -78,30 +78,24 @@ private class SrtParsingSession(content: String) {
     private fun parseTiming(line: String, lineNumber: Int): CueTiming {
         val match = TIMING_PATTERN.matchEntire(line)
             ?: throw InvalidSubtitleException("Invalid timing line at line $lineNumber")
-        val start = match.groupValues[1]
-        val end = match.groupValues[2]
-        if (!hasValidClockParts(start) || !hasValidClockParts(end)) {
-            throw InvalidSubtitleException("Invalid timestamp at line $lineNumber")
-        }
-        if (toMilliseconds(end) <= toMilliseconds(start)) {
+        val startMs = parseTimestamp(match.groupValues[1], lineNumber)
+        val endMs = parseTimestamp(match.groupValues[2], lineNumber)
+        if (endMs <= startMs) {
             throw InvalidSubtitleException("Cue end time must be after its start time at line $lineNumber")
         }
-        return CueTiming(start, end)
+        return CueTiming(startMs, endMs)
     }
 
-    private fun hasValidClockParts(timestamp: String): Boolean {
-        val (_, minutes, secondsAndMillis) = timestamp.split(':')
-        val (seconds) = secondsAndMillis.split(',')
-        return minutes.toInt() < 60 && seconds.toInt() < 60
-    }
-
-    private fun toMilliseconds(timestamp: String): Long {
+    private fun parseTimestamp(timestamp: String, lineNumber: Int): Int {
         val (hours, minutes, secondsAndMillis) = timestamp.split(':')
         val (seconds, millis) = secondsAndMillis.split(',')
-        return (((hours.toLong() * 60 + minutes.toLong()) * 60 + seconds.toLong()) * 1000) + millis.toLong()
+        if (minutes.toInt() >= 60 || seconds.toInt() >= 60) {
+            throw InvalidSubtitleException("Invalid timestamp at line $lineNumber")
+        }
+        return ((hours.toInt() * 60 + minutes.toInt()) * 60 + seconds.toInt()) * 1000 + millis.toInt()
     }
 
-    private data class CueTiming(val start: String, val end: String)
+    private data class CueTiming(val startMs: Int, val endMs: Int)
 
     private enum class ParseState {
         SEQUENCE_NUMBER,

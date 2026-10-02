@@ -1,8 +1,8 @@
 package com.subinjector.enrichment
 
-import com.subinjector.subtitle.SubtitleEntry
-import org.junit.jupiter.api.Assertions.assertTrue
+import com.subinjector.subtitle.SubtitleCue
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.springframework.beans.factory.annotation.Autowired
@@ -31,10 +31,10 @@ class CueEnricherLocalSmokeTests {
         assertTrue(result.notes.all { it.expression.isNotBlank() && it.explanation.isNotBlank() })
     }
 
-    private fun cue(number: Int, text: String) = SubtitleEntry(
+    private fun cue(number: Int, text: String) = SubtitleCue(
         sequenceNumber = number,
-        startTime = "00:00:01,000",
-        endTime = "00:00:02,000",
+        startMs = 1_000,
+        endMs = 2_000,
         text = text,
     )
 }
