@@ -38,6 +38,10 @@ class EnrichmentJobController(private val service: EnrichmentJobService) {
     @GetMapping("/enrichment-jobs/{jobId}")
     fun getJob(@PathVariable jobId: UUID): EnrichmentJobProgress = service.getJob(jobId)
 
+    @PostMapping("/enrichment-jobs/{jobId}/retry")
+    fun retry(@PathVariable jobId: UUID): ResponseEntity<EnrichmentJobProgress> =
+        ResponseEntity.accepted().body(service.retrySkippedTasks(jobId))
+
     @GetMapping("/enrichment-jobs/{jobId}/results")
     fun getResults(@PathVariable jobId: UUID): List<EnrichmentJobCueResult> = service.getResults(jobId)
 }

@@ -1,6 +1,7 @@
 package com.subinjector
 
 import com.subinjector.enrichment.EnrichmentJobNotFoundException
+import com.subinjector.enrichment.EnrichmentJobNotRetryableException
 import com.subinjector.enrichment.SubtitleDocumentNotFoundException
 import com.subinjector.subtitle.InvalidSubtitleException
 import org.springframework.http.HttpStatus
@@ -22,4 +23,9 @@ class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun handleMissingResource(exception: RuntimeException): Map<String, String> =
         mapOf("error" to (exception.message ?: "Requested resource was not found"))
+
+    @ExceptionHandler(EnrichmentJobNotRetryableException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun handleNotRetryable(exception: EnrichmentJobNotRetryableException): Map<String, String> =
+        mapOf("error" to (exception.message ?: "Job cannot be retried in its current state"))
 }

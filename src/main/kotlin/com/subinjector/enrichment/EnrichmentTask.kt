@@ -25,6 +25,7 @@ class EnrichmentTask(
     val cue: SubtitleCueEntity,
     @Enumerated(EnumType.STRING)
     var status: CueEnrichmentStatus = CueEnrichmentStatus.PENDING,
+    var attempts: Int = 0,
     @Column(columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     var result: String? = null,

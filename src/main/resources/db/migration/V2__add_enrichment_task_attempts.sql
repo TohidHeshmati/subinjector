@@ -1,0 +1,2 @@
+ALTER TABLE enrichment_task
+    ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
