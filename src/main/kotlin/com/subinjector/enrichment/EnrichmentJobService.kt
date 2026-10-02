@@ -79,6 +79,7 @@ class EnrichmentJobService(
         val taskId = taskRepository.lockNextPendingTaskId() ?: return null
         val task = taskRepository.findById(taskId).orElse(null) ?: return null
         task.status = CueEnrichmentStatus.PROCESSING
+        task.attempts += 1
         task.updatedAt = OffsetDateTime.now()
         task.job.status = EnrichmentJobStatus.PROCESSING
         task.job.updatedAt = OffsetDateTime.now()
@@ -117,10 +118,27 @@ class EnrichmentJobService(
     }
 
     @Transactional
+    fun retrySkippedTasks(jobId: UUID): EnrichmentJobProgress {
+        val job = jobRepository.findById(jobId).orElseThrow { EnrichmentJobNotFoundException(jobId.toString()) }
+        if (job.status != EnrichmentJobStatus.COMPLETED) throw EnrichmentJobNotRetryableException(jobId.toString())
+        val now = OffsetDateTime.now()
+        val retried = taskRepository.retrySkippedByJobId(jobId, now, CueEnrichmentStatus.PENDING, CueEnrichmentStatus.SKIPPED, MAX_TASK_ATTEMPTS)
+        if (retried > 0) {
+            job.status = EnrichmentJobStatus.QUEUED
+            job.updatedAt = now
+        }
+        return job.toProgress()
+    }
+
+    @Transactional
     fun recoverInterruptedWork() {
         val now = OffsetDateTime.now()
         taskRepository.resetStatus(CueEnrichmentStatus.PROCESSING, CueEnrichmentStatus.PENDING, now)
         jobRepository.resetStatus(EnrichmentJobStatus.PROCESSING, EnrichmentJobStatus.QUEUED, now)
+    }
+
+    private companion object {
+        const val MAX_TASK_ATTEMPTS = 3
     }
 
     private fun createJobForDocument(

@@ -34,4 +34,18 @@ interface EnrichmentTaskRepository : JpaRepository<EnrichmentTask, UUID> {
         @Param("to") to: CueEnrichmentStatus,
         @Param("now") now: OffsetDateTime,
     )
+
+    @Modifying
+    @Query("""
+        UPDATE EnrichmentTask t
+        SET t.status = :pending, t.error = null, t.updatedAt = :now
+        WHERE t.job.id = :jobId AND t.status = :skipped AND t.attempts < :maxAttempts
+    """)
+    fun retrySkippedByJobId(
+        @Param("jobId") jobId: UUID,
+        @Param("now") now: OffsetDateTime,
+        @Param("pending") pending: CueEnrichmentStatus,
+        @Param("skipped") skipped: CueEnrichmentStatus,
+        @Param("maxAttempts") maxAttempts: Int,
+    ): Int
 }
