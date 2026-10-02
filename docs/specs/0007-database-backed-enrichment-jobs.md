@@ -74,12 +74,15 @@ erDiagram
 - Test that cue processing follows document sequence and that a skipped cue does not stop the job.
 - Choose an isolated PostgreSQL test strategy before implementation.
 
+## Decisions made for this implementation
+
+- Job statuses are `QUEUED`, `PROCESSING`, and `COMPLETED`; cue statuses are `PENDING`, `PROCESSING`, `SUCCEEDED`, and `SKIPPED`. A model or response-validation failure skips that cue. Unexpected infrastructure failures stop the current worker pass and leave durable work for recovery.
+- Upload returns `202 Accepted` with document and job IDs. Clients poll `GET /api/enrichment-jobs/{jobId}` for progress and use `GET /api/enrichment-jobs/{jobId}/results` for ordered cue outcomes.
+- Results are available while processing; pending and processing cue records have no enrichment result yet.
+- On startup, interrupted `PROCESSING` cues are returned to `PENDING`, and their jobs are returned to `QUEUED`. This is at-least-once processing: a restart between generation and result persistence may cause the model call to be repeated.
+- Each request creates a new job, including repeated requests for the same document, language, and learner level. Result reuse or caching is deferred until a requirement justifies it.
+- Automated integration tests use the configured PostgreSQL database and unique test documents, so they do not depend on or delete developer data.
+
 ## Open questions
 
-- What exact job and cue-enrichment status names should be used, and how should unexpected infrastructure errors differ from a skipped model cue?
-- Should upload return `202 Accepted` with a job ID, and should clients poll one job endpoint for both progress and results?
-- Should results be available while processing is still underway?
 - Which document metadata should be retained, and should the original uploaded file bytes be stored so a future parser can reprocess them?
-- If the process stops while a cue is marked processing, should that cue be retried after restart? A retry may call the model again if generation completed before its result was committed.
-- Does repeating the same document, language, and learner-level request create a new job, or should a later feature reuse/cache an earlier result?
-- Which PostgreSQL test setup best balances fidelity and ease of running tests locally and in CI?
