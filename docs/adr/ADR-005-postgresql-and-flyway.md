@@ -13,7 +13,7 @@ The project needs a relational database that works well with the Spring Boot app
 
 Use PostgreSQL as the relational database and Flyway to apply ordered, versioned database migrations. Database schema changes will be represented in source control as Flyway migrations rather than relying on automatic ORM schema generation.
 
-This decision selects the database and migration mechanism. It does not yet decide the job schema, processing worker design, job API, retention policy, or deployment arrangement.
+This decision selects the database and migration mechanism. The source-document, cue, enrichment-job, and per-cue outcome relationships are recorded in [ADR-006](ADR-006-subtitle-documents-and-enrichment-runs.md). The job API, detailed status vocabulary, retention policy, and deployment arrangement remain open.
 
 ## Alternatives considered
 
