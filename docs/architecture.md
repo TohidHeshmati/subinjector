@@ -11,6 +11,7 @@ Subinjector is a Kotlin Spring Boot application built with Gradle Kotlin DSL. Th
 - **Gradle Kotlin DSL:** Keeps the build configuration in Kotlin, and the checked-in wrapper provides a repeatable Gradle entry point.
 - **Spring MVC:** Handles the existing REST and multipart HTTP requests.
 - **Automated tests:** Spring Boot's test support and MockMvc cover application, web, and parser behavior without requiring a live external service.
+- **PostgreSQL and Flyway:** PostgreSQL is the selected relational database, with Flyway migrations under `src/main/resources/db/migration`. A Docker Compose service provides local PostgreSQL. Database-backed job processing is not implemented yet; see [ADR-005](adr/ADR-005-postgresql-and-flyway.md).
 - **Feature-first packages:** The application entry point is in `com.subinjector`; endpoint and subtitle code live in their feature packages. Public top-level types have their own matching files. See [ADR-001](adr/ADR-001-package-organization.md).
 - **SRT parser:** `SubtitleParser` separates parsing from the upload transport; `SrtSubtitleParser` uses ordered states for cue number, timing, and text. See [ADR-002](adr/ADR-002-srt-parser-design.md).
 
@@ -31,4 +32,4 @@ Ollama with `qwen3:0.6b` can be exercised through opt-in smoke tests. Enrichment
 
 ## Future possibilities
 
-Additional AI provider adapters, cloud providers, and other product capabilities may be considered when a requirement is defined. They are possibilities, not implemented components or current commitments. Audiobook processing remains outside the initial scope. No database, message broker, deployment platform, or distributed architecture has been selected.
+Additional AI provider adapters, cloud providers, and other product capabilities may be considered when a requirement is defined. They are possibilities, not implemented components or current commitments. PostgreSQL, Flyway, and local Docker Compose setup are in place, but durable job repositories, background processing, and status/result APIs are not; see [ADR-005](adr/ADR-005-postgresql-and-flyway.md) and [specification 0007](specs/0007-database-backed-enrichment-jobs.md). Audiobook processing remains outside the initial scope. No message broker, deployment platform, or distributed architecture has been selected.

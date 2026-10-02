@@ -37,3 +37,4 @@ Under what circumstances should we reconsider this decision?
 - [ADR-002: Parse SRT with an explicit parser contract and format-specific state machine](ADR-002-srt-parser-design.md)
 - [ADR-003: Isolate AI providers behind an application port](ADR-003-ai-provider-port-and-adapters.md)
 - [ADR-004: Use a separate enrichment prompt strategy per learning language](ADR-004-language-specific-enrichment-prompts.md)
+- [ADR-005: Use PostgreSQL with Flyway for persistence](ADR-005-postgresql-and-flyway.md)
