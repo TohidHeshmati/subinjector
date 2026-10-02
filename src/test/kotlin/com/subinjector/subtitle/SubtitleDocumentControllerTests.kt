@@ -4,6 +4,7 @@ import com.subinjector.ai.LanguageModel
 import com.subinjector.ai.LanguageModelOutputFormat
 import com.subinjector.enrichment.EnrichmentJobWorker
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -20,14 +22,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multi
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest(properties = ["subinjector.enrichment.worker.enabled=false"])
 @AutoConfigureMockMvc
-@Import(SubtitleUploadControllerTests.TestLanguageModelConfiguration::class)
-@Transactional
-class SubtitleUploadControllerTests {
+@Import(SubtitleDocumentControllerTests.TestLanguageModelConfiguration::class)
+class SubtitleDocumentControllerTests {
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -36,6 +36,14 @@ class SubtitleUploadControllerTests {
 
     @Autowired
     lateinit var worker: EnrichmentJobWorker
+
+    @Autowired
+    lateinit var jdbc: JdbcTemplate
+
+    @BeforeEach
+    fun cleanDatabase() {
+        jdbc.execute("TRUNCATE TABLE cue_enrichment, enrichment_job, subtitle_cue, subtitle_document CASCADE")
+    }
 
     @Test
     fun `uploads an SRT and returns accepted job then exposes progress and saved cue results`() {
@@ -88,7 +96,7 @@ class SubtitleUploadControllerTests {
             "1\n00:00:01,000 --> 00:00:02,000\nHallo\n\n2\n00:00:02,000 --> 00:00:03,000\nFAIL".toByteArray(),
         )
         val response = mockMvc.perform(
-            multipart("/api/subtitles/upload").file(file)
+            multipart("/api/subtitle-documents").file(file)
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andReturn()
@@ -112,7 +120,7 @@ class SubtitleUploadControllerTests {
     @Test
     fun `rejects a non-SRT upload`() {
         mockMvc.perform(
-            multipart("/api/subtitles/upload")
+            multipart("/api/subtitle-documents")
                 .file(MockMultipartFile("file", "lesson.txt", "text/plain", "content".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
@@ -122,7 +130,7 @@ class SubtitleUploadControllerTests {
     @Test
     fun `rejects an empty SRT upload`() {
         mockMvc.perform(
-            multipart("/api/subtitles/upload")
+            multipart("/api/subtitle-documents")
                 .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
@@ -132,7 +140,7 @@ class SubtitleUploadControllerTests {
     @Test
     fun `rejects an SRT upload with no cues`() {
         mockMvc.perform(
-            multipart("/api/subtitles/upload")
+            multipart("/api/subtitle-documents")
                 .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
@@ -148,18 +156,18 @@ class SubtitleUploadControllerTests {
             "1\n00:00:01,000 --> 00:00:02,000\nHallo".toByteArray(),
         )
         mockMvc.perform(
-            multipart("/api/subtitles/upload").file(file)
+            multipart("/api/subtitle-documents").file(file)
                 .param("learningLanguage", "FRENCH")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
         mockMvc.perform(
-            multipart("/api/subtitles/upload").file(file)
+            multipart("/api/subtitle-documents").file(file)
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "D8"),
         ).andExpect(status().isBadRequest)
     }
 
-    private fun upload() = multipart("/api/subtitles/upload")
+    private fun upload() = multipart("/api/subtitle-documents")
         .file(
             MockMultipartFile(
                 "file",

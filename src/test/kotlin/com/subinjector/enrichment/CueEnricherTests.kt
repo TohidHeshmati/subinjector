@@ -247,6 +247,7 @@ class CueEnricherTests {
         targetCue = target,
         previousCue = previous,
         nextCue = next,
+        learningLanguage = LearningLanguage.GERMAN,
         learnerLevel = learnerLevel,
     )
 

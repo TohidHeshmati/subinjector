@@ -21,6 +21,7 @@ class CueEnricherLocalSmokeTests {
                 targetCue = cue(2, "Ich verstehe nur Bahnhof."),
                 previousCue = cue(1, "Was hast du gesagt?"),
                 nextCue = cue(3, "Ich erkläre es dir noch einmal."),
+                learningLanguage = LearningLanguage.GERMAN,
                 learnerLevel = CefrLevel.B1,
             ),
         )

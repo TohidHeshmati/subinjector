@@ -1,10 +1,18 @@
 package com.subinjector.enrichment
 
+import com.subinjector.subtitle.SubtitleEntry
 import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
 class EnrichmentJobService(private val store: EnrichmentJobStore) {
+    fun createDocument(
+        filename: String?,
+        cues: List<SubtitleEntry>,
+        learningLanguage: LearningLanguage,
+        learnerLevel: CefrLevel,
+    ): EnrichmentSubmission = store.createDocument(filename ?: "unknown", cues, learningLanguage, learnerLevel)
+
     fun createJob(
         documentId: UUID,
         learningLanguage: LearningLanguage,
