@@ -50,6 +50,12 @@ class EnrichmentJobService(
     }
 
     @Transactional(readOnly = true)
+    fun listJobsForDocument(documentId: UUID): List<EnrichmentJobProgress> {
+        if (!documentRepository.existsById(documentId)) throw SubtitleDocumentNotFoundException(documentId.toString())
+        return jobRepository.findByDocumentId(documentId).map { it.toProgress() }
+    }
+
+    @Transactional(readOnly = true)
     fun getJob(jobId: UUID): EnrichmentJobProgress {
         val job = jobRepository.findById(jobId).orElseThrow { EnrichmentJobNotFoundException(jobId.toString()) }
         return job.toProgress()

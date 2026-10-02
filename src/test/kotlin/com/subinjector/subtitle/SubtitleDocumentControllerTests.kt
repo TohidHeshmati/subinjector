@@ -14,30 +14,25 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.ObjectMapper
-import org.springframework.jdbc.core.JdbcTemplate
 
 @SpringBootTest(properties = ["subinjector.enrichment.worker.enabled=false"])
 @AutoConfigureMockMvc
 @Import(SubtitleDocumentControllerTests.TestLanguageModelConfiguration::class)
 class SubtitleDocumentControllerTests {
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
-    @Autowired
-    lateinit var objectMapper: ObjectMapper
-
-    @Autowired
-    lateinit var worker: EnrichmentJobWorker
-
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
+    @Autowired lateinit var mockMvc: MockMvc
+    @Autowired lateinit var objectMapper: ObjectMapper
+    @Autowired lateinit var worker: EnrichmentJobWorker
+    @Autowired lateinit var jdbc: JdbcTemplate
 
     @BeforeEach
     fun cleanDatabase() {
@@ -71,6 +66,78 @@ class SubtitleDocumentControllerTests {
     }
 
     @Test
+    fun `lists all uploaded documents`() {
+        mockMvc.perform(upload())
+        mockMvc.perform(upload())
+
+        mockMvc.perform(get("/api/subtitle-documents"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].filename").value("lesson.srt"))
+            .andExpect(jsonPath("$[0].cueCount").value(1))
+    }
+
+    @Test
+    fun `gets a single document by id`() {
+        val response = mockMvc.perform(upload()).andReturn()
+        val documentId = objectMapper.readTree(response.response.contentAsString)["documentId"].stringValue()
+
+        mockMvc.perform(get("/api/subtitle-documents/$documentId"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.documentId").value(documentId))
+            .andExpect(jsonPath("$.filename").value("lesson.srt"))
+            .andExpect(jsonPath("$.cueCount").value(1))
+    }
+
+    @Test
+    fun `returns 404 for a missing document`() {
+        mockMvc.perform(get("/api/subtitle-documents/00000000-0000-0000-0000-000000000000"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `deletes a document and its jobs`() {
+        val response = mockMvc.perform(upload()).andReturn()
+        val documentId = objectMapper.readTree(response.response.contentAsString)["documentId"].stringValue()
+
+        mockMvc.perform(delete("/api/subtitle-documents/$documentId"))
+            .andExpect(status().isNoContent)
+
+        mockMvc.perform(get("/api/subtitle-documents/$documentId"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `returns 404 when deleting a missing document`() {
+        mockMvc.perform(delete("/api/subtitle-documents/00000000-0000-0000-0000-000000000000"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `lists enrichment jobs for a document`() {
+        val response = mockMvc.perform(upload()).andReturn()
+        val documentId = objectMapper.readTree(response.response.contentAsString)["documentId"].stringValue()
+
+        mockMvc.perform(
+            post("/api/subtitle-documents/$documentId/enrichment-jobs")
+                .param("learningLanguage", "GERMAN")
+                .param("learnerLevel", "A2"),
+        )
+
+        mockMvc.perform(get("/api/subtitle-documents/$documentId/enrichment-jobs"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].status").value("QUEUED"))
+            .andExpect(jsonPath("$[1].status").value("QUEUED"))
+    }
+
+    @Test
+    fun `returns 404 when listing jobs for a missing document`() {
+        mockMvc.perform(get("/api/subtitle-documents/00000000-0000-0000-0000-000000000000/enrichment-jobs"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
     fun `creates another enrichment job for the same stored document`() {
         val response = mockMvc.perform(upload()).andReturn()
         val documentId = objectMapper.readTree(response.response.contentAsString)["documentId"].stringValue()
@@ -88,10 +155,8 @@ class SubtitleDocumentControllerTests {
 
     @Test
     fun `skips a failed cue and continues until the job is complete`() {
-        val file = org.springframework.mock.web.MockMultipartFile(
-            "file",
-            "lesson.srt",
-            "application/x-subrip",
+        val file = MockMultipartFile(
+            "file", "lesson.srt", "application/x-subrip",
             "1\n00:00:01,000 --> 00:00:02,000\nHallo\n\n2\n00:00:02,000 --> 00:00:03,000\nFAIL".toByteArray(),
         )
         val response = mockMvc.perform(
@@ -120,7 +185,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects a non-SRT upload`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.txt", "text/plain", "content".toByteArray()))
+                .file(MockMultipartFile("file", "lesson.txt", "text/plain", "content".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -130,7 +195,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects an empty SRT upload`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf()))
+                .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -140,7 +205,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects an SRT upload with no cues`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray()))
+                .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -148,10 +213,8 @@ class SubtitleDocumentControllerTests {
 
     @Test
     fun `rejects unsupported learning language and CEFR values`() {
-        val file = org.springframework.mock.web.MockMultipartFile(
-            "file",
-            "lesson.srt",
-            "application/x-subrip",
+        val file = MockMultipartFile(
+            "file", "lesson.srt", "application/x-subrip",
             "1\n00:00:01,000 --> 00:00:02,000\nHallo".toByteArray(),
         )
         mockMvc.perform(
@@ -168,10 +231,8 @@ class SubtitleDocumentControllerTests {
 
     private fun upload() = multipart("/api/subtitle-documents")
         .file(
-            org.springframework.mock.web.MockMultipartFile(
-                "file",
-                "lesson.srt",
-                "application/x-subrip",
+            MockMultipartFile(
+                "file", "lesson.srt", "application/x-subrip",
                 "1\n00:00:01,000 --> 00:00:02,000\nHallo".toByteArray(),
             ),
         )

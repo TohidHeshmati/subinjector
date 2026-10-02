@@ -4,17 +4,22 @@ import com.subinjector.enrichment.CefrLevel
 import com.subinjector.enrichment.EnrichmentJobService
 import com.subinjector.enrichment.EnrichmentSubmission
 import com.subinjector.enrichment.LearningLanguage
+import com.subinjector.enrichment.SubtitleDocumentNotFoundException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 @Service
 class SubtitleDocumentService(
     private val subtitleParser: SubtitleParser,
+    private val documentRepository: SubtitleDocumentRepository,
     private val enrichmentJobService: EnrichmentJobService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    @Transactional
     fun create(
         filename: String?,
         content: ByteArray,
@@ -42,5 +47,19 @@ class SubtitleDocumentService(
             elapsedMillis,
         )
         return enrichmentJobService.createDocument(filename, cues, learningLanguage, learnerLevel)
+    }
+
+    @Transactional(readOnly = true)
+    fun list(): List<SubtitleDocumentSummary> = documentRepository.findAllSummaries()
+
+    @Transactional(readOnly = true)
+    fun get(documentId: UUID): SubtitleDocumentSummary =
+        documentRepository.findSummaryById(documentId)
+            ?: throw SubtitleDocumentNotFoundException(documentId.toString())
+
+    @Transactional
+    fun delete(documentId: UUID) {
+        if (!documentRepository.existsById(documentId)) throw SubtitleDocumentNotFoundException(documentId.toString())
+        documentRepository.deleteById(documentId)
     }
 }
