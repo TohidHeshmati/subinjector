@@ -1,14 +1,26 @@
 package com.subinjector.subtitle
 
+import com.subinjector.enrichment.CefrLevel
+import com.subinjector.enrichment.CueEnrichmentStatus
+import com.subinjector.enrichment.LearningLanguage
+import com.subinjector.enrichment.SubtitleEnrichmentService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
 
 @Service
-class SubtitleUploadService(private val subtitleParser: SubtitleParser) {
+class SubtitleUploadService(
+    private val subtitleParser: SubtitleParser,
+    private val subtitleEnrichmentService: SubtitleEnrichmentService,
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun upload(filename: String?, content: ByteArray): Int {
+    fun upload(
+        filename: String?,
+        content: ByteArray,
+        learningLanguage: LearningLanguage,
+        learnerLevel: CefrLevel,
+    ): SubtitleUploadResponse {
         if (content.isEmpty()) throw InvalidSubtitleException("Uploaded file is empty")
         if (filename?.endsWith(".srt", ignoreCase = true) != true) {
             throw InvalidSubtitleException("Uploaded file must have an .srt filename")
@@ -29,6 +41,12 @@ class SubtitleUploadService(private val subtitleParser: SubtitleParser) {
             lastEntry.endTime,
             elapsedMillis,
         )
-        return entries.size
+        val enrichedCues = subtitleEnrichmentService.enrich(entries, learningLanguage, learnerLevel)
+        return SubtitleUploadResponse(
+            cueCount = entries.size,
+            succeededCueCount = enrichedCues.count { it.status == CueEnrichmentStatus.SUCCEEDED },
+            skippedCueCount = enrichedCues.count { it.status == CueEnrichmentStatus.SKIPPED },
+            cues = enrichedCues,
+        )
     }
 }

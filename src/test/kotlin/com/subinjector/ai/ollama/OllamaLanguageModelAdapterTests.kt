@@ -1,6 +1,7 @@
 package com.subinjector.ai.ollama
 
 import com.subinjector.ai.LanguageModelException
+import com.subinjector.ai.LanguageModelOutputFormat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
@@ -9,6 +10,10 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.ai.ollama.OllamaChatModel
+import org.springframework.ai.ollama.api.OllamaApi
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.content
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
@@ -26,7 +31,15 @@ class OllamaLanguageModelAdapterTests {
     fun setUp() {
         val builder = RestClient.builder()
         server = MockRestServiceServer.bindTo(builder).build()
-        model = OllamaLanguageModelAdapter(builder.baseUrl(OLLAMA_URL).build(), MODEL)
+        val api = OllamaApi.builder()
+            .baseUrl(OLLAMA_URL)
+            .restClientBuilder(builder)
+            .build()
+        val chatModel = OllamaChatModel.builder()
+            .ollamaApi(api)
+            .retryTemplate(RetryTemplate(RetryPolicy.withMaxRetries(0)))
+            .build()
+        model = OllamaLanguageModelAdapter(chatModel, MODEL)
     }
 
     @Test
@@ -41,16 +54,23 @@ class OllamaLanguageModelAdapterTests {
                       "model": "$MODEL",
                       "messages": [{"role":"user","content":"Reply with exactly LOCAL_OK"}],
                       "stream": false,
-                      "think": false,
-                      "keep_alive": 0,
-                      "options": {"num_predict":64}
+                      "keep_alive": "5m",
+                      "options": {"num_predict":64},
+                      "format": "json"
                     }
                     """.trimIndent(),
                 ),
             )
             .andRespond(withSuccess("""{"message":{"content":"LOCAL_OK"},"done":true}""", MediaType.APPLICATION_JSON))
 
-        assertEquals("LOCAL_OK", model.generate("Reply with exactly LOCAL_OK", maxOutputTokens = 64))
+        assertEquals(
+            "LOCAL_OK",
+            model.generate(
+                "Reply with exactly LOCAL_OK",
+                maxOutputTokens = 64,
+                outputFormat = LanguageModelOutputFormat.JSON,
+            ),
+        )
         server.verify()
     }
 
@@ -89,9 +109,9 @@ class OllamaLanguageModelAdapterTests {
     }
 
     @Test
-    fun `rejects a response with non-text assistant content`() {
+    fun `rejects a response with blank assistant content`() {
         server.expect(requestTo("$OLLAMA_URL/api/chat"))
-            .andRespond(withSuccess("""{"message":{"content":42},"done":true}""", MediaType.APPLICATION_JSON))
+            .andRespond(withSuccess("""{"message":{"content":"  "},"done":true}""", MediaType.APPLICATION_JSON))
 
         assertThrows(LanguageModelException::class.java) { model.generate("hello", maxOutputTokens = 64) }
         server.verify()
@@ -117,8 +137,7 @@ class OllamaLanguageModelAdapterTests {
                       "model": "$MODEL",
                       "messages": [{"role":"user","content":"Er sagte: \"Hallo\"\nWie geht's?"}],
                       "stream": false,
-                      "think": false,
-                      "keep_alive": 0,
+                      "keep_alive": "5m",
                       "options": {"num_predict":64}
                     }
                     """.trimIndent(),

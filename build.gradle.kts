@@ -23,6 +23,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.ai:spring-ai-model")
+    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
     implementation(kotlin("reflect"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

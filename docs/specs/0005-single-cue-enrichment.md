@@ -46,6 +46,4 @@ Use the local language model to produce concise learning notes for one subtitle 
 
 ## Open questions
 - What exact multipart field names and validation errors should expose the language and CEFR choices on the upload endpoint?
-- How should a malformed cue response be handled during eventual full-file processing: fail the whole file, retry the cue, or return partial enrichment?
-- What processing and model-lifetime strategy will keep large subtitles (for example, 2,000 cues) within acceptable runtime and memory use?
 - Should a future language-specific prompt also choose a different explanation language, or should explanation language remain a separate user setting?
