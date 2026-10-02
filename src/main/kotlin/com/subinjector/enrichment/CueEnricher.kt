@@ -1,6 +1,7 @@
 package com.subinjector.enrichment
 
 import com.subinjector.ai.LanguageModel
+import com.subinjector.ai.LanguageModelOutputFormat
 import com.subinjector.enrichment.prompt.CueEnrichmentPrompt
 import org.springframework.stereotype.Service
 import tools.jackson.core.JacksonException
@@ -19,6 +20,7 @@ class CueEnricher(
         val generatedResponse = languageModel.generate(
             prompt = prompt.build(request),
             maxOutputTokens = MAX_OUTPUT_TOKENS,
+            outputFormat = LanguageModelOutputFormat.JSON,
         )
         return parseResponse(generatedResponse, request.targetCue.sequenceNumber)
     }

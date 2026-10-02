@@ -1,6 +1,7 @@
 package com.subinjector.enrichment
 
 import com.subinjector.ai.LanguageModel
+import com.subinjector.ai.LanguageModelOutputFormat
 import com.subinjector.enrichment.prompt.CueEnrichmentPrompt
 import com.subinjector.enrichment.prompt.GermanCueEnrichmentPrompt
 import com.subinjector.subtitle.SubtitleEntry
@@ -27,6 +28,7 @@ class CueEnricherTests {
 
         assertEquals(12, result.cueNumber)
         assertEquals(512, model.lastMaxOutputTokens)
+        assertEquals(LanguageModelOutputFormat.JSON, model.lastOutputFormat)
         assertEquals(
             listOf(EnrichmentNote(EnrichmentCategory.IDIOM, "Bahnhof verstehen", "It means not to understand what is being said.")),
             result.notes,
@@ -260,10 +262,17 @@ class CueEnricherTests {
             private set
         var lastMaxOutputTokens: Int? = null
             private set
+        var lastOutputFormat: LanguageModelOutputFormat? = null
+            private set
 
-        override fun generate(prompt: String, maxOutputTokens: Int): String {
+        override fun generate(
+            prompt: String,
+            maxOutputTokens: Int,
+            outputFormat: LanguageModelOutputFormat,
+        ): String {
             lastPrompt = prompt
             lastMaxOutputTokens = maxOutputTokens
+            lastOutputFormat = outputFormat
             return response
         }
     }

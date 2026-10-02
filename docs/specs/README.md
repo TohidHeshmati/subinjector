@@ -29,4 +29,4 @@ What behavior needs verification?
 - ...
 ```
 
-Specifications are numbered by work item and kept small enough to guide one reviewable implementation slice. See [0001: Hello World endpoint](0001-hello-world-endpoint.md), [0002: SRT multipart upload](0002-srt-multipart-upload.md), [0003: SRT parser boundaries](0003-srt-parser-boundaries.md), [0004: Ollama provider adapter](0004-ollama-provider-adapter.md), and [0005: Single-cue enrichment](0005-single-cue-enrichment.md).
+Specifications are numbered by work item and kept small enough to guide one reviewable implementation slice. See [0001: Hello World endpoint](0001-hello-world-endpoint.md), [0002: SRT multipart upload](0002-srt-multipart-upload.md), [0003: SRT parser boundaries](0003-srt-parser-boundaries.md), [0004: Ollama provider adapter](0004-ollama-provider-adapter.md), [0005: Single-cue enrichment](0005-single-cue-enrichment.md), and [0006: Sequential subtitle enrichment](0006-sequential-subtitle-enrichment.md).
