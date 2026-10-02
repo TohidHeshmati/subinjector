@@ -8,6 +8,9 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 interface EnrichmentJobRepository : JpaRepository<EnrichmentJob, UUID> {
+    @Query("SELECT j FROM EnrichmentJob j WHERE j.document.id = :documentId ORDER BY j.createdAt DESC")
+    fun findByDocumentId(@Param("documentId") documentId: UUID): List<EnrichmentJob>
+
     @Modifying
     @Query("UPDATE EnrichmentJob j SET j.status = :to, j.updatedAt = :now WHERE j.status = :from")
     fun resetStatus(

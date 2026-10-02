@@ -15,6 +15,10 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api")
 class EnrichmentJobController(private val service: EnrichmentJobService) {
+    @GetMapping("/subtitle-documents/{documentId}/enrichment-jobs")
+    fun listJobs(@PathVariable documentId: UUID): List<EnrichmentJobProgress> =
+        service.listJobsForDocument(documentId)
+
     @PostMapping("/subtitle-documents/{documentId}/enrichment-jobs")
     fun createJob(
         @PathVariable documentId: UUID,
