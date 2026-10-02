@@ -4,7 +4,7 @@ import com.subinjector.ai.LanguageModel
 import com.subinjector.ai.LanguageModelOutputFormat
 import com.subinjector.enrichment.prompt.CueEnrichmentPrompt
 import com.subinjector.enrichment.prompt.GermanCueEnrichmentPrompt
-import com.subinjector.subtitle.SubtitleEntry
+import com.subinjector.subtitle.SubtitleCue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -239,9 +239,9 @@ class CueEnricherTests {
         CueEnricher(model, prompts, mapper)
 
     private fun request(
-        target: SubtitleEntry = cue(12, "Ich verstehe nur Bahnhof."),
-        previous: SubtitleEntry? = cue(11, "Was hast du gerade gesagt?"),
-        next: SubtitleEntry? = cue(13, "Dann erkläre ich es noch einmal."),
+        target: SubtitleCue = cue(12, "Ich verstehe nur Bahnhof."),
+        previous: SubtitleCue? = cue(11, "Was hast du gerade gesagt?"),
+        next: SubtitleCue? = cue(13, "Dann erkläre ich es noch einmal."),
         learnerLevel: CefrLevel = CefrLevel.B1,
     ) = CueEnrichmentRequest(
         targetCue = target,
@@ -251,10 +251,10 @@ class CueEnricherTests {
         learnerLevel = learnerLevel,
     )
 
-    private fun cue(number: Int, text: String) = SubtitleEntry(
+    private fun cue(number: Int, text: String) = SubtitleCue(
         sequenceNumber = number,
-        startTime = "00:00:01,000",
-        endTime = "00:00:02,000",
+        startMs = 1_000,
+        endMs = 2_000,
         text = text,
     )
 

@@ -14,8 +14,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
@@ -23,6 +21,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.ObjectMapper
+import org.springframework.jdbc.core.JdbcTemplate
 
 @SpringBootTest(properties = ["subinjector.enrichment.worker.enabled=false"])
 @AutoConfigureMockMvc
@@ -42,7 +41,7 @@ class SubtitleDocumentControllerTests {
 
     @BeforeEach
     fun cleanDatabase() {
-        jdbc.execute("TRUNCATE TABLE cue_enrichment, enrichment_job, subtitle_cue, subtitle_document CASCADE")
+        jdbc.execute("TRUNCATE TABLE enrichment_task, enrichment_job, subtitle_cue, subtitle_document CASCADE")
     }
 
     @Test
@@ -89,7 +88,7 @@ class SubtitleDocumentControllerTests {
 
     @Test
     fun `skips a failed cue and continues until the job is complete`() {
-        val file = MockMultipartFile(
+        val file = org.springframework.mock.web.MockMultipartFile(
             "file",
             "lesson.srt",
             "application/x-subrip",
@@ -121,7 +120,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects a non-SRT upload`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(MockMultipartFile("file", "lesson.txt", "text/plain", "content".toByteArray()))
+                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.txt", "text/plain", "content".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -131,7 +130,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects an empty SRT upload`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf()))
+                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.srt", "application/x-subrip", byteArrayOf()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -141,7 +140,7 @@ class SubtitleDocumentControllerTests {
     fun `rejects an SRT upload with no cues`() {
         mockMvc.perform(
             multipart("/api/subtitle-documents")
-                .file(MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray()))
+                .file(org.springframework.mock.web.MockMultipartFile("file", "lesson.srt", "application/x-subrip", "\n  \n".toByteArray()))
                 .param("learningLanguage", "GERMAN")
                 .param("learnerLevel", "B1"),
         ).andExpect(status().isBadRequest)
@@ -149,7 +148,7 @@ class SubtitleDocumentControllerTests {
 
     @Test
     fun `rejects unsupported learning language and CEFR values`() {
-        val file = MockMultipartFile(
+        val file = org.springframework.mock.web.MockMultipartFile(
             "file",
             "lesson.srt",
             "application/x-subrip",
@@ -169,7 +168,7 @@ class SubtitleDocumentControllerTests {
 
     private fun upload() = multipart("/api/subtitle-documents")
         .file(
-            MockMultipartFile(
+            org.springframework.mock.web.MockMultipartFile(
                 "file",
                 "lesson.srt",
                 "application/x-subrip",

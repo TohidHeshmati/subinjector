@@ -4,7 +4,7 @@ import com.subinjector.enrichment.CefrLevel
 import com.subinjector.enrichment.CueEnricher
 import com.subinjector.enrichment.CueEnrichmentRequest
 import com.subinjector.enrichment.LearningLanguage
-import com.subinjector.subtitle.SubtitleEntry
+import com.subinjector.subtitle.SubtitleCue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -33,10 +33,10 @@ class OllamaLocalSmokeTests {
         assert(result.notes.size <= 3)
     }
 
-    private fun cue(number: Int, text: String) = SubtitleEntry(
+    private fun cue(number: Int, text: String) = SubtitleCue(
         sequenceNumber = number,
-        startTime = "00:00:01,000",
-        endTime = "00:00:02,000",
+        startMs = 1_000,
+        endMs = 2_000,
         text = text,
     )
 }

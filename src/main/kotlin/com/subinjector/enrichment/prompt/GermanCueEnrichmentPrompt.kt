@@ -2,7 +2,7 @@ package com.subinjector.enrichment.prompt
 
 import com.subinjector.enrichment.CueEnrichmentRequest
 import com.subinjector.enrichment.LearningLanguage
-import com.subinjector.subtitle.SubtitleEntry
+import com.subinjector.subtitle.SubtitleCue
 import org.springframework.ai.chat.prompt.PromptTemplate
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.Resource
@@ -33,12 +33,20 @@ class GermanCueEnrichmentPrompt(
         )
     }
 
-    private fun SubtitleEntry?.toPromptData(): Map<String, Any?>? = this?.let {
+    private fun SubtitleCue?.toPromptData(): Map<String, Any?>? = this?.let {
         mapOf(
             "sequenceNumber" to it.sequenceNumber,
-            "startTime" to it.startTime,
-            "endTime" to it.endTime,
+            "startTime" to formatMs(it.startMs),
+            "endTime" to formatMs(it.endMs),
             "text" to it.text,
         )
+    }
+
+    private fun formatMs(ms: Int): String {
+        val hours = ms / 3_600_000
+        val minutes = (ms % 3_600_000) / 60_000
+        val seconds = (ms % 60_000) / 1_000
+        val millis = ms % 1_000
+        return "%02d:%02d:%02d,%03d".format(hours, minutes, seconds, millis)
     }
 }

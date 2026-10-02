@@ -1,6 +1,6 @@
 package com.subinjector.enrichment
 
-import com.subinjector.subtitle.SubtitleEntry
+import com.subinjector.subtitle.SubtitleCue
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -14,10 +14,10 @@ data class EnrichmentSubmission(
 data class EnrichmentJobProgress(
     val jobId: UUID,
     val documentId: UUID,
-    val learningLanguage: LearningLanguage,
-    val learnerLevel: CefrLevel,
+    val language: LearningLanguage,
+    val level: CefrLevel,
     val status: EnrichmentJobStatus,
-    val totalCueCount: Int,
+    val cueCount: Int,
     val pendingCueCount: Int,
     val processingCueCount: Int,
     val succeededCueCount: Int,
@@ -27,16 +27,17 @@ data class EnrichmentJobProgress(
 )
 
 data class EnrichmentJobCueResult(
-    val cue: SubtitleEntry,
+    val cue: SubtitleCue,
     val status: CueEnrichmentStatus,
     val enrichment: CueEnrichment?,
 )
 
 data class ClaimedCue(
+    val taskId: UUID,
     val jobId: UUID,
-    val cue: SubtitleEntry,
-    val previousCue: SubtitleEntry?,
-    val nextCue: SubtitleEntry?,
+    val cue: SubtitleCue,
+    val previousCue: SubtitleCue?,
+    val nextCue: SubtitleCue?,
     val learningLanguage: LearningLanguage,
     val learnerLevel: CefrLevel,
 )

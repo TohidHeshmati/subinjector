@@ -2,18 +2,18 @@ package com.subinjector.enrichment
 
 import com.subinjector.ai.LanguageModelException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import org.springframework.context.annotation.Configuration
-import org.springframework.beans.factory.annotation.Value
 
 @Component
 class EnrichmentJobWorker(
-    private val store: EnrichmentJobStore,
+    private val service: EnrichmentJobService,
     private val cueEnricher: CueEnricher,
     @Value("\${subinjector.enrichment.worker.enabled:true}") private val workerEnabled: Boolean,
 ) {
@@ -21,7 +21,7 @@ class EnrichmentJobWorker(
 
     @EventListener(ApplicationReadyEvent::class)
     fun recoverInterruptedCues() {
-        if (workerEnabled) store.recoverInterruptedWork()
+        if (workerEnabled) service.recoverInterruptedWork()
     }
 
     @Scheduled(
@@ -29,7 +29,7 @@ class EnrichmentJobWorker(
         initialDelayString = "\${subinjector.enrichment.worker.initial-delay:5000}",
     )
     fun processOneCue() {
-        val claimed = store.claimNextCue() ?: return
+        val claimed = service.claimNextTask() ?: return
         try {
             val result = cueEnricher.enrich(
                 CueEnrichmentRequest(
@@ -40,7 +40,7 @@ class EnrichmentJobWorker(
                     learnerLevel = claimed.learnerLevel,
                 ),
             )
-            store.saveSuccess(claimed.jobId, claimed.cue.sequenceNumber, result)
+            service.saveSuccess(claimed.taskId, result)
             logger.debug("Saved enrichment for cue {} in job {}", claimed.cue.sequenceNumber, claimed.jobId)
         } catch (exception: CueEnrichmentException) {
             skip(claimed, exception)
@@ -50,7 +50,7 @@ class EnrichmentJobWorker(
     }
 
     private fun skip(claimed: ClaimedCue, exception: Exception) {
-        store.saveSkipped(claimed.jobId, claimed.cue.sequenceNumber)
+        service.saveSkipped(claimed.taskId, exception.message ?: "No failure detail available")
         logger.warn(
             "Skipped cue enrichment: jobId={}, sequenceNumber={}, failureType={}, reason={}",
             claimed.jobId,

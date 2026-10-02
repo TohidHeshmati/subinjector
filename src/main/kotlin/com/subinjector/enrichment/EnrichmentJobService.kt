@@ -1,29 +1,161 @@
 package com.subinjector.enrichment
 
-import com.subinjector.subtitle.SubtitleEntry
+import com.subinjector.subtitle.SubtitleCue
+import com.subinjector.subtitle.SubtitleCueEntity
+import com.subinjector.subtitle.SubtitleCueRepository
+import com.subinjector.subtitle.SubtitleDocument
+import com.subinjector.subtitle.SubtitleDocumentRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Service
-class EnrichmentJobService(private val store: EnrichmentJobStore) {
+class EnrichmentJobService(
+    private val documentRepository: SubtitleDocumentRepository,
+    private val cueRepository: SubtitleCueRepository,
+    private val jobRepository: EnrichmentJobRepository,
+    private val taskRepository: EnrichmentTaskRepository,
+    private val objectMapper: ObjectMapper,
+) {
+    @Transactional
     fun createDocument(
         filename: String?,
-        cues: List<SubtitleEntry>,
-        learningLanguage: LearningLanguage,
-        learnerLevel: CefrLevel,
-    ): EnrichmentSubmission = store.createDocument(filename ?: "unknown", cues, learningLanguage, learnerLevel)
+        cues: List<SubtitleCue>,
+        language: LearningLanguage,
+        level: CefrLevel,
+    ): EnrichmentSubmission {
+        val document = documentRepository.save(SubtitleDocument(filename ?: "unknown", "SRT"))
+        val cueEntities = cues.map { cue ->
+            SubtitleCueEntity(
+                document = document,
+                sequenceNumber = cue.sequenceNumber,
+                startMs = cue.startMs,
+                endMs = cue.endMs,
+                originalText = cue.text,
+            )
+        }
+        cueRepository.saveAll(cueEntities)
+        return createJobForDocument(document, cues.size, language, level)
+    }
 
-    fun createJob(
-        documentId: UUID,
-        learningLanguage: LearningLanguage,
-        learnerLevel: CefrLevel,
-    ): EnrichmentSubmission = store.createJobForDocument(documentId, learningLanguage, learnerLevel)
+    @Transactional
+    fun createJob(documentId: UUID, language: LearningLanguage, level: CefrLevel): EnrichmentSubmission {
+        val document = documentRepository.findById(documentId)
+            .orElseThrow { SubtitleDocumentNotFoundException(documentId.toString()) }
+        val cueCount = cueRepository.countByDocument(document).toInt()
+        if (cueCount == 0) throw SubtitleDocumentNotFoundException(documentId.toString())
+        return createJobForDocument(document, cueCount, language, level)
+    }
 
-    fun getJob(jobId: UUID): EnrichmentJobProgress =
-        store.findJob(jobId) ?: throw EnrichmentJobNotFoundException(jobId.toString())
+    @Transactional(readOnly = true)
+    fun getJob(jobId: UUID): EnrichmentJobProgress {
+        val job = jobRepository.findById(jobId).orElseThrow { EnrichmentJobNotFoundException(jobId.toString()) }
+        return job.toProgress()
+    }
 
+    @Transactional(readOnly = true)
     fun getResults(jobId: UUID): List<EnrichmentJobCueResult> {
-        getJob(jobId)
-        return store.findResults(jobId)
+        if (!jobRepository.existsById(jobId)) throw EnrichmentJobNotFoundException(jobId.toString())
+        return taskRepository.findByJobIdWithCues(jobId).map { task ->
+            val rawResult = task.result
+            EnrichmentJobCueResult(
+                cue = task.cue.toDomain(),
+                status = task.status,
+                enrichment = rawResult?.let { objectMapper.readValue(it, CueEnrichment::class.java) },
+            )
+        }
+    }
+
+    @Transactional
+    fun claimNextTask(): ClaimedCue? {
+        val taskId = taskRepository.lockNextPendingTaskId() ?: return null
+        val task = taskRepository.findById(taskId).orElse(null) ?: return null
+        task.status = CueEnrichmentStatus.PROCESSING
+        task.updatedAt = OffsetDateTime.now()
+        task.job.status = EnrichmentJobStatus.PROCESSING
+        task.job.updatedAt = OffsetDateTime.now()
+
+        val cue = task.cue
+        val previous = cueRepository.findPreviousCue(cue.document, cue.sequenceNumber).firstOrNull()
+        val next = cueRepository.findNextCue(cue.document, cue.sequenceNumber).firstOrNull()
+
+        return ClaimedCue(
+            taskId = task.id,
+            jobId = task.job.id,
+            cue = cue.toDomain(),
+            previousCue = previous?.toDomain(),
+            nextCue = next?.toDomain(),
+            learningLanguage = task.job.language,
+            learnerLevel = task.job.level,
+        )
+    }
+
+    @Transactional
+    fun saveSuccess(taskId: UUID, enrichment: CueEnrichment) {
+        val task = taskRepository.findById(taskId).orElseThrow()
+        task.status = CueEnrichmentStatus.SUCCEEDED
+        task.result = objectMapper.writeValueAsString(enrichment)
+        task.updatedAt = OffsetDateTime.now()
+        completeJobIfFinished(task.job)
+    }
+
+    @Transactional
+    fun saveSkipped(taskId: UUID, reason: String) {
+        val task = taskRepository.findById(taskId).orElseThrow()
+        task.status = CueEnrichmentStatus.SKIPPED
+        task.error = reason
+        task.updatedAt = OffsetDateTime.now()
+        completeJobIfFinished(task.job)
+    }
+
+    @Transactional
+    fun recoverInterruptedWork() {
+        val now = OffsetDateTime.now()
+        taskRepository.resetStatus(CueEnrichmentStatus.PROCESSING, CueEnrichmentStatus.PENDING, now)
+        jobRepository.resetStatus(EnrichmentJobStatus.PROCESSING, EnrichmentJobStatus.QUEUED, now)
+    }
+
+    private fun createJobForDocument(
+        document: SubtitleDocument,
+        cueCount: Int,
+        language: LearningLanguage,
+        level: CefrLevel,
+    ): EnrichmentSubmission {
+        val job = jobRepository.save(EnrichmentJob(document, language, level, cueCount))
+        val cueEntities = cueRepository.findAllByDocumentOrderBySequenceNumber(document)
+        val tasks = cueEntities.map { cue -> EnrichmentTask(job = job, cue = cue) }
+        taskRepository.saveAll(tasks)
+        return EnrichmentSubmission(document.id, job.id, EnrichmentJobStatus.QUEUED, cueCount)
+    }
+
+    private fun completeJobIfFinished(job: EnrichmentJob) {
+        val stillActive = taskRepository.existsByJobAndStatusIn(
+            job,
+            listOf(CueEnrichmentStatus.PENDING, CueEnrichmentStatus.PROCESSING),
+        )
+        if (!stillActive) {
+            job.status = EnrichmentJobStatus.COMPLETED
+            job.updatedAt = OffsetDateTime.now()
+        }
+    }
+
+    private fun EnrichmentJob.toProgress(): EnrichmentJobProgress {
+        val jobId = this.id
+        return EnrichmentJobProgress(
+            jobId = jobId,
+            documentId = document.id,
+            language = language,
+            level = level,
+            status = status,
+            cueCount = cueCount,
+            pendingCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.PENDING).toInt(),
+            processingCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.PROCESSING).toInt(),
+            succeededCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.SUCCEEDED).toInt(),
+            skippedCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.SKIPPED).toInt(),
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
     }
 }
