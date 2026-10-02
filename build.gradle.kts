@@ -22,9 +22,14 @@ dependencies {
     implementation(platform("org.springframework.ai:spring-ai-bom:2.0.1"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.ai:spring-ai-model")
     implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation(kotlin("reflect"))
+
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+    runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

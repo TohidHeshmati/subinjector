@@ -4,7 +4,26 @@ Subinjector is a personal project exploring an AI-assisted way to learn language
 
 ## Status
 
-**Foundation only.** The application currently contains a minimal Kotlin and Spring Boot setup, with no product features implemented.
+**Early development.** The application can parse an uploaded SRT file, enrich cues sequentially with a configured local Ollama model, and return each original cue with its enrichment status and notes. The current upload flow is synchronous. VTT support, contextual cue grouping, and subtitle/glossary exports are not implemented yet.
+
+## Intended subtitle-learning flow
+
+The diagram shows the product direction. Labels indicate what exists today and what remains planned; each future step will be specified and implemented incrementally.
+
+```mermaid
+flowchart TD
+    A["Upload subtitles<br/>SRT supported · VTT planned"]
+    B["Validate file and subtitle data<br/>SRT structure and timestamps supported<br/>Strict encoding and size policies to define"]
+    C["Parse into timed subtitle cues<br/>SRT supported"]
+    D["Build contextual blocks<br/>Adjacent cue context supported<br/>Grouping related cues planned"]
+    E["Enrich with an LLM<br/>Sequential local Ollama requests supported"]
+    F["Validate and attach results<br/>JSON shape, cue reference, and note limits checked"]
+    G["Export enriched subtitles<br/>SRT/VTT and separate glossary planned"]
+
+    A --> B --> C --> D --> E --> F --> G
+```
+
+Today, the upload API returns the original SRT cues and their enrichment as JSON. The later export step will produce downloadable subtitle and glossary files.
 
 ## Development goals
 
@@ -24,15 +43,22 @@ AI assistance should stay within one small implementation slice at a time. The p
 
 The Gradle wrapper is included, so a separate Gradle installation is not required.
 
-## Build, test, and run
+## Local development
 
-From the project root:
+The application and Spring Boot integration tests expect PostgreSQL on port `5432`. Start the local database before building, testing, or running the application. Flyway applies pending migrations at application startup.
 
 ```bash
+docker compose up -d --wait postgres
 ./gradlew build
 ./gradlew test
 ./gradlew bootRun
 ```
+
+Stop PostgreSQL with `docker compose down`. The named volume preserves local data between runs. To remove the volume and recreate an empty database, use `docker compose down --volumes`.
+
+The Compose file uses local development credentials. Set `DATABASE_PASSWORD` in your shell or a local `.env` file to override the password; do not reuse the default outside local development.
+
+The Gradle wrapper is included, so a separate Gradle installation is not required. Java 21 (LTS) is required. Windows users can use `gradlew.bat` for Gradle commands.
 
 The foundation exposes one introductory endpoint:
 
@@ -40,7 +66,5 @@ The foundation exposes one introductory endpoint:
 curl http://localhost:8080/api/hello
 # {"message":"Hello, world!"}
 ```
-
-Windows users can use `gradlew.bat`. No subtitle-learning functionality is implemented yet.
 
 Features will be added incrementally, with requirements and design decisions documented as they are established.
