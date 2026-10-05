@@ -39,3 +39,4 @@ Under what circumstances should we reconsider this decision?
 - [ADR-004: Use a separate enrichment prompt strategy per learning language](ADR-004-language-specific-enrichment-prompts.md)
 - [ADR-005: Use PostgreSQL with Flyway for persistence](ADR-005-postgresql-and-flyway.md)
 - [ADR-006: Separate subtitle documents from enrichment runs](ADR-006-subtitle-documents-and-enrichment-runs.md)
+- [ADR-007: Local model sizing for target hardware](ADR-007-local-model-sizing.md) (informational)
