@@ -1,6 +1,6 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
-import com.subinjector.BaseEntity
+import com.subinjector.shared.BaseEntity
 import com.subinjector.subtitle.SubtitleCueEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -24,7 +24,7 @@ class EnrichmentTask(
     @JoinColumn(name = "cue_id")
     val cue: SubtitleCueEntity,
     @Enumerated(EnumType.STRING)
-    var status: CueEnrichmentStatus = CueEnrichmentStatus.PENDING,
+    var status: EnrichmentTaskStatus = EnrichmentTaskStatus.PENDING,
     var attempts: Int = 0,
     @Column(columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)

@@ -1,9 +1,9 @@
-package com.subinjector
+package com.subinjector.shared
 
-import com.subinjector.enrichment.EnrichmentJobNotFoundException
-import com.subinjector.enrichment.EnrichmentJobNotRetryableException
-import com.subinjector.enrichment.SubtitleDocumentNotFoundException
-import com.subinjector.subtitle.InvalidSubtitleException
+import com.subinjector.enrichment.job.EnrichmentJobNotFoundException
+import com.subinjector.enrichment.job.EnrichmentJobNotRetryableException
+import com.subinjector.subtitle.SubtitleDocumentNotFoundException
+import com.subinjector.subtitle.parser.InvalidSubtitleException
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus

@@ -1,4 +1,4 @@
-package com.subinjector
+package com.subinjector.shared
 
 import jakarta.persistence.Column
 import jakarta.persistence.Id

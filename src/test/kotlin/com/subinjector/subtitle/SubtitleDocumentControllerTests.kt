@@ -2,7 +2,7 @@ package com.subinjector.subtitle
 
 import com.subinjector.ai.LanguageModel
 import com.subinjector.ai.LanguageModelOutputFormat
-import com.subinjector.enrichment.EnrichmentJobWorker
+import com.subinjector.enrichment.job.EnrichmentJobWorker
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

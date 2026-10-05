@@ -1,5 +1,6 @@
-package com.subinjector.subtitle
+package com.subinjector.subtitle.parser
 
+import com.subinjector.subtitle.SubtitleCue
 import org.springframework.stereotype.Component
 
 @Component

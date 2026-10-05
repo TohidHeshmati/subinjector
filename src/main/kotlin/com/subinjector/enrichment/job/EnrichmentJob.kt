@@ -1,6 +1,8 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
-import com.subinjector.BaseEntity
+import com.subinjector.enrichment.CefrLevel
+import com.subinjector.enrichment.LearningLanguage
+import com.subinjector.shared.BaseEntity
 import com.subinjector.subtitle.SubtitleDocument
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
