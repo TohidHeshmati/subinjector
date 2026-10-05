@@ -13,7 +13,12 @@ Subinjector is a Kotlin Spring Boot application built with Gradle Kotlin DSL. Th
 - **Automated tests:** Spring Boot's test support and MockMvc cover application, web, and parser behavior without requiring a live external service.
 - **PostgreSQL and Flyway:** PostgreSQL stores subtitle documents, parsed cues, enrichment jobs, and per-cue outcomes. Flyway migrations under `src/main/resources/db/migration` evolve the schema. A Docker Compose service provides local PostgreSQL. PostgreSQL is also the initial work queue; processing is sequential in one application instance.
 - **Durable enrichment jobs:** Upload persists all source cues and pending outcomes transactionally, then returns `202 Accepted`. The worker claims a cue in a short transaction, calls the model outside the transaction, and stores its validated result in another transaction. Model and validation failures skip one cue; processing resumes with pending cues after restart. Recovery may repeat a model call if the process stopped after generation but before saving its result. See [ADR-006](adr/ADR-006-subtitle-documents-and-enrichment-runs.md) and [specification 0007](specs/0007-database-backed-enrichment-jobs.md).
-- **Feature-first packages:** The application entry point is in `com.subinjector`; endpoint and subtitle code live in their feature packages. Public top-level types have their own matching files. See [ADR-001](adr/ADR-001-package-organization.md).
+- **Feature-first packages:** The application entry point is in `com.subinjector`. Public top-level types have their own matching files. See [ADR-001](adr/ADR-001-package-organization.md).
+  - `subtitle`: subtitle documents, cues, and the upload API; `subtitle.parser` holds format parsing.
+  - `enrichment`: turning one cue into teaching notes (prompt, model call, output validation); `enrichment.prompt` holds language-specific prompts.
+  - `enrichment.job`: durable background processing (jobs, per-cue tasks, worker, job API).
+  - `ai`: provider-neutral language model port and its adapters.
+  - `shared`: cross-feature infrastructure such as the base entity and API error handling.
 - **SRT parser:** `SubtitleParser` separates parsing from the upload transport; `SrtSubtitleParser` uses ordered states for cue number, timing, and text. See [ADR-002](adr/ADR-002-srt-parser-design.md).
 
 ## AI provider direction

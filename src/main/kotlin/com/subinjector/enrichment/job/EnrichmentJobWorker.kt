@@ -1,13 +1,13 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
 import com.subinjector.ai.LanguageModelException
+import com.subinjector.enrichment.CueEnricher
+import com.subinjector.enrichment.CueEnrichmentException
+import com.subinjector.enrichment.CueEnrichmentRequest
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.event.ApplicationReadyEvent
-import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
-import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -61,7 +61,3 @@ class EnrichmentJobWorker(
     }
 }
 
-@Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = ["subinjector.enrichment.worker.enabled"], havingValue = "true", matchIfMissing = true)
-@EnableScheduling
-class EnrichmentWorkerSchedulingConfiguration

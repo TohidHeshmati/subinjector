@@ -1,4 +1,4 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
 enum class EnrichmentJobStatus {
     QUEUED,

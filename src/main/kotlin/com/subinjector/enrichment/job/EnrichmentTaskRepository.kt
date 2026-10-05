@@ -1,4 +1,4 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
@@ -23,15 +23,15 @@ interface EnrichmentTaskRepository : JpaRepository<EnrichmentTask, UUID> {
     fun findByJobIdWithCues(@Param("jobId") jobId: UUID): List<EnrichmentTask>
 
     @Query("SELECT COUNT(t) FROM EnrichmentTask t WHERE t.job.id = :jobId AND t.status = :status")
-    fun countByJobIdAndStatus(@Param("jobId") jobId: UUID, @Param("status") status: CueEnrichmentStatus): Long
+    fun countByJobIdAndStatus(@Param("jobId") jobId: UUID, @Param("status") status: EnrichmentTaskStatus): Long
 
-    fun existsByJobAndStatusIn(job: EnrichmentJob, statuses: List<CueEnrichmentStatus>): Boolean
+    fun existsByJobAndStatusIn(job: EnrichmentJob, statuses: List<EnrichmentTaskStatus>): Boolean
 
     @Modifying
     @Query("UPDATE EnrichmentTask t SET t.status = :to, t.updatedAt = :now WHERE t.status = :from")
     fun resetStatus(
-        @Param("from") from: CueEnrichmentStatus,
-        @Param("to") to: CueEnrichmentStatus,
+        @Param("from") from: EnrichmentTaskStatus,
+        @Param("to") to: EnrichmentTaskStatus,
         @Param("now") now: OffsetDateTime,
     )
 
@@ -44,8 +44,8 @@ interface EnrichmentTaskRepository : JpaRepository<EnrichmentTask, UUID> {
     fun retrySkippedByJobId(
         @Param("jobId") jobId: UUID,
         @Param("now") now: OffsetDateTime,
-        @Param("pending") pending: CueEnrichmentStatus,
-        @Param("skipped") skipped: CueEnrichmentStatus,
+        @Param("pending") pending: EnrichmentTaskStatus,
+        @Param("skipped") skipped: EnrichmentTaskStatus,
         @Param("maxAttempts") maxAttempts: Int,
     ): Int
 }

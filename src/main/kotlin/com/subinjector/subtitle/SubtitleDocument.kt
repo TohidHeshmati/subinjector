@@ -1,6 +1,6 @@
 package com.subinjector.subtitle
 
-import com.subinjector.BaseEntity
+import com.subinjector.shared.BaseEntity
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import java.time.OffsetDateTime

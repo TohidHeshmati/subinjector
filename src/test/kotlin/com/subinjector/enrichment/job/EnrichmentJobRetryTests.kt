@@ -1,4 +1,4 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
 import com.subinjector.ai.LanguageModel
 import com.subinjector.ai.LanguageModelOutputFormat

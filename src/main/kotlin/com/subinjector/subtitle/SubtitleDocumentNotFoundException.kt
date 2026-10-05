@@ -1,3 +1,3 @@
-package com.subinjector.enrichment
+package com.subinjector.subtitle
 
 class SubtitleDocumentNotFoundException(id: String) : RuntimeException("Subtitle document $id was not found")

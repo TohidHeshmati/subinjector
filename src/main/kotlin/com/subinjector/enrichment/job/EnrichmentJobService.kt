@@ -1,9 +1,11 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
-import com.subinjector.subtitle.SubtitleCue
-import com.subinjector.subtitle.SubtitleCueEntity
+import com.subinjector.enrichment.CefrLevel
+import com.subinjector.enrichment.CueEnrichment
+import com.subinjector.enrichment.LearningLanguage
 import com.subinjector.subtitle.SubtitleCueRepository
 import com.subinjector.subtitle.SubtitleDocument
+import com.subinjector.subtitle.SubtitleDocumentNotFoundException
 import com.subinjector.subtitle.SubtitleDocumentRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,27 +21,6 @@ class EnrichmentJobService(
     private val taskRepository: EnrichmentTaskRepository,
     private val objectMapper: ObjectMapper,
 ) {
-    @Transactional
-    fun createDocument(
-        filename: String?,
-        cues: List<SubtitleCue>,
-        language: LearningLanguage,
-        level: CefrLevel,
-    ): EnrichmentSubmission {
-        val document = documentRepository.save(SubtitleDocument(filename ?: "unknown", "SRT"))
-        val cueEntities = cues.map { cue ->
-            SubtitleCueEntity(
-                document = document,
-                sequenceNumber = cue.sequenceNumber,
-                startMs = cue.startMs,
-                endMs = cue.endMs,
-                originalText = cue.text,
-            )
-        }
-        cueRepository.saveAll(cueEntities)
-        return createJobForDocument(document, cues.size, language, level)
-    }
-
     @Transactional
     fun createJob(documentId: UUID, language: LearningLanguage, level: CefrLevel): EnrichmentSubmission {
         val document = documentRepository.findById(documentId)
@@ -78,7 +59,7 @@ class EnrichmentJobService(
     fun claimNextTask(): ClaimedCue? {
         val taskId = taskRepository.lockNextPendingTaskId() ?: return null
         val task = taskRepository.findById(taskId).orElse(null) ?: return null
-        task.status = CueEnrichmentStatus.PROCESSING
+        task.status = EnrichmentTaskStatus.PROCESSING
         task.attempts += 1
         task.updatedAt = OffsetDateTime.now()
         task.job.status = EnrichmentJobStatus.PROCESSING
@@ -102,7 +83,7 @@ class EnrichmentJobService(
     @Transactional
     fun saveSuccess(taskId: UUID, enrichment: CueEnrichment) {
         val task = taskRepository.findById(taskId).orElseThrow()
-        task.status = CueEnrichmentStatus.SUCCEEDED
+        task.status = EnrichmentTaskStatus.SUCCEEDED
         task.result = objectMapper.writeValueAsString(enrichment)
         task.updatedAt = OffsetDateTime.now()
         completeJobIfFinished(task.job)
@@ -111,7 +92,7 @@ class EnrichmentJobService(
     @Transactional
     fun saveSkipped(taskId: UUID, reason: String) {
         val task = taskRepository.findById(taskId).orElseThrow()
-        task.status = CueEnrichmentStatus.SKIPPED
+        task.status = EnrichmentTaskStatus.SKIPPED
         task.error = reason
         task.updatedAt = OffsetDateTime.now()
         completeJobIfFinished(task.job)
@@ -122,7 +103,7 @@ class EnrichmentJobService(
         val job = jobRepository.findById(jobId).orElseThrow { EnrichmentJobNotFoundException(jobId.toString()) }
         if (job.status != EnrichmentJobStatus.COMPLETED) throw EnrichmentJobNotRetryableException(jobId.toString())
         val now = OffsetDateTime.now()
-        val retried = taskRepository.retrySkippedByJobId(jobId, now, CueEnrichmentStatus.PENDING, CueEnrichmentStatus.SKIPPED, MAX_TASK_ATTEMPTS)
+        val retried = taskRepository.retrySkippedByJobId(jobId, now, EnrichmentTaskStatus.PENDING, EnrichmentTaskStatus.SKIPPED, MAX_TASK_ATTEMPTS)
         if (retried > 0) {
             job.status = EnrichmentJobStatus.QUEUED
             job.updatedAt = now
@@ -133,7 +114,7 @@ class EnrichmentJobService(
     @Transactional
     fun recoverInterruptedWork() {
         val now = OffsetDateTime.now()
-        taskRepository.resetStatus(CueEnrichmentStatus.PROCESSING, CueEnrichmentStatus.PENDING, now)
+        taskRepository.resetStatus(EnrichmentTaskStatus.PROCESSING, EnrichmentTaskStatus.PENDING, now)
         jobRepository.resetStatus(EnrichmentJobStatus.PROCESSING, EnrichmentJobStatus.QUEUED, now)
     }
 
@@ -141,7 +122,8 @@ class EnrichmentJobService(
         const val MAX_TASK_ATTEMPTS = 3
     }
 
-    private fun createJobForDocument(
+    @Transactional
+    fun createJobForDocument(
         document: SubtitleDocument,
         cueCount: Int,
         language: LearningLanguage,
@@ -157,7 +139,7 @@ class EnrichmentJobService(
     private fun completeJobIfFinished(job: EnrichmentJob) {
         val stillActive = taskRepository.existsByJobAndStatusIn(
             job,
-            listOf(CueEnrichmentStatus.PENDING, CueEnrichmentStatus.PROCESSING),
+            listOf(EnrichmentTaskStatus.PENDING, EnrichmentTaskStatus.PROCESSING),
         )
         if (!stillActive) {
             job.status = EnrichmentJobStatus.COMPLETED
@@ -174,10 +156,10 @@ class EnrichmentJobService(
             level = level,
             status = status,
             cueCount = cueCount,
-            pendingCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.PENDING).toInt(),
-            processingCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.PROCESSING).toInt(),
-            succeededCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.SUCCEEDED).toInt(),
-            skippedCueCount = taskRepository.countByJobIdAndStatus(jobId, CueEnrichmentStatus.SKIPPED).toInt(),
+            pendingCueCount = taskRepository.countByJobIdAndStatus(jobId, EnrichmentTaskStatus.PENDING).toInt(),
+            processingCueCount = taskRepository.countByJobIdAndStatus(jobId, EnrichmentTaskStatus.PROCESSING).toInt(),
+            succeededCueCount = taskRepository.countByJobIdAndStatus(jobId, EnrichmentTaskStatus.SUCCEEDED).toInt(),
+            skippedCueCount = taskRepository.countByJobIdAndStatus(jobId, EnrichmentTaskStatus.SKIPPED).toInt(),
             createdAt = createdAt,
             updatedAt = updatedAt,
         )

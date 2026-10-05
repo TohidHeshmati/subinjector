@@ -1,8 +1,8 @@
 package com.subinjector.subtitle
 
 import com.subinjector.enrichment.CefrLevel
-import com.subinjector.enrichment.EnrichmentSubmission
 import com.subinjector.enrichment.LearningLanguage
+import com.subinjector.enrichment.job.EnrichmentSubmission
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType

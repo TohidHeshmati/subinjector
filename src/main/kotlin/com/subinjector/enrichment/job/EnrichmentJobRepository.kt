@@ -1,4 +1,4 @@
-package com.subinjector.enrichment
+package com.subinjector.enrichment.job
 
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
