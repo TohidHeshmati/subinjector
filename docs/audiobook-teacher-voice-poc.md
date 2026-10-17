@@ -237,10 +237,11 @@ Owner's observations on the Serena version:
 * The voice sounds like a real teacher.
 * Switching Persian → German → Persian works well.
 * German pronunciation is good.
-* The name **Gregor (گرگور) is mispronounced**, by Ryan as well. Persian script does not write short vowels, so the model has to guess. This is accepted as a compromise.
-* **Vowel marks are not the fix:** the owner tried them before on another Persian text and the result got worse. A two-spelling test (گِرِگور / گْرِگور) was generated anyway (`persian_teacher_serena_gregor_*.wav`, script `lab_scripts/persian_fix_gregor.py`), but vowel marking is not part of the plan.
+* The name **Gregor (گرگور) is mispronounced**, by Ryan as well. Persian script does not write short vowels, so the model has to guess.
+* **Vowel marks on the name only fix it.** Block 03 was regenerated with the name spelled **گِرِگور** ("ge-re-gor"); everything else unchanged (`persian_teacher_serena_gregor_a_geregor.wav`, 64.2 s; block 03 took 128 s; script `lab_scripts/persian_fix_gregor.py`). Owner's verdict: **Gregor is now pronounced correctly; "very very good".** A second spelling, گْرِگور, was also generated for comparison.
+* **Vowel-marking the whole text is not the fix:** the owner tried that before on another Persian text and the result got worse. The rule is therefore: **add vowel marks to foreign names only**, never to the full text.
 
-**Decision from this test:** the preferred teacher is **Serena's voice via Higgs Audio v3, explaining in Persian, with the same voice reading the German examples.**
+**Decision from this test:** the preferred teacher is **Serena's voice via Higgs Audio v3, explaining in Persian, with the same voice reading the German examples, and with vowel marks on foreign names only.** Best result so far: `persian_teacher_serena_gregor_a_geregor.wav`.
 
 ## 5. Findings
 
@@ -264,7 +265,7 @@ Owner's observations on the Serena version:
 * **German words inside English sentences** are anglicised by an English voice.
 * **Single-word TTS clips** get unpredictable prosody; splicing them mid-sentence sounds broken.
 * **Two different voices** for teacher and examples feel odd.
-* **Foreign names in Persian text** (Gregor) are mispronounced; vowel marks made Persian worse in the owner's earlier experience. Accepted as a compromise.
+* **Foreign names in plain Persian text** (Gregor) are mispronounced. Fixed by vowel-marking the name only (گِرِگور); vowel-marking the whole text made Persian worse in the owner's earlier experience.
 * **Filler in the teacher's text** ("enjoy the story", plot explanations) adds length without value.
 
 ### Operational findings
@@ -399,7 +400,7 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 - [ ] 0.8 **Real use:** generate briefings for all of chapter 1 (~12 sections of ~3 min) and listen over several days. Questions: did I listen to all of them? Did the briefing help me catch the words? Is voice better than reading the notes?
 - [ ] 0.9 Persian script from the LLM: let `qwen3:8b` write the spoken Persian teacher blocks itself (informal spoken style) and compare with `gemma3:12b`. The owner judges naturalness and correctness.
 - [ ] 0.10 Small local Higgs Audio v3 HTTP service (one endpoint: text + language → WAV; fixed Serena reference clip, transcript and seed; model loaded once, unloaded when idle), so the lab script, and later Subinjector, call it like Voicebox.
-- [ ] 0.11 Names in Persian blocks: accept mispronunciation, and add a prompt rule to mention character names sparingly (for example "the main character" instead of repeating Gregor). No vowel marks.
+- [ ] 0.11 Names in Persian blocks: keep a small per-book list of vowel-marked spellings for character and place names (e.g. Gregor → گِرِگور) and apply it to the Persian script before TTS, or ask the LLM to vowel-mark names only. Never vowel-mark the whole text. Also mention names sparingly.
 - [ ] 0.12 Store the teacher voice definition (reference clip, transcript, seed, settings) in one versioned place, so the voice stays identical across runs.
 - [ ] **Go / no-go decision**, recorded as an ADR that updates the product scope.
 
