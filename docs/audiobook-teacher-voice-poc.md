@@ -1,7 +1,7 @@
 # Audiobook teacher-voice proof of concept
 
 * **Date:** 2026-10-17
-* **Status:** Proof of concept done; validation phase (Phase 0 below) not started
+* **Status:** Proof of concept done, including a Persian teacher voice; validation phase (Phase 0 below) in progress
 * **Related:** [Roadmap — Phase 6: Audiobook pipeline](../ROADMAP.md), [ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md), [ADR-007](adr/ADR-007-local-model-sizing.md), [Product overview](product.md)
 
 This document records a manual proof of concept that tested whether Subinjector should grow from subtitles into audiobooks with a spoken "teacher" briefing. It covers what was built, every result and failure, the decisions made in discussion, and the proposed task list. No application code was written; everything ran as shell commands and small Python scripts outside this repository.
@@ -174,7 +174,73 @@ Design changes based on 4.1:
 
 Instructs: English *"A warm, friendly language teacher talking to one student, relaxed, natural pace."*; German *"Calm, clear standard German at a moderate, even volume, like an audiobook narrator."*
 
-Result file: `07_course_style_test/course_style_two_words.wav`, 58.9 s (24 kHz mono). Generation of all five blocks took a few minutes; the model was unloaded afterwards. Raw and levelled blocks are in `07_course_style_test/segments/`, so a single block can be regenerated. **Owner's verdict: pending.**
+Result file: `07_course_style_test/course_style_two_words_ryan_en_serena_de.wav` (originally `course_style_two_words.wav`), 58.9 s (24 kHz mono). Generation of all five blocks took a few minutes; the model was unloaded afterwards. Raw and levelled blocks are in `07_course_style_test/segments/`, so a single block can be regenerated.
+
+**Owner's verdict:**
+
+* The course-style format is **really good**.
+* Without "slowly" in the instruct, the delivery is **much better**.
+* Switching from a male English voice (Ryan) to a female German voice (Serena) **feels odd**. One voice for both languages is preferred.
+* Some teacher sentences are unnecessary filler ("enjoy the story", explaining that Gregor fears his boss will come with the doctor). This is a prompt issue, deferred to the content work; the focus here is the voice.
+
+### 4.3 Single-voice variants
+
+The lab script was changed to take the English and German voice as arguments and to cache blocks per voice (`<block>_<voice>.wav`), so only missing blocks are generated.
+
+| File | Voices | Length | New blocks generated |
+|---|---|---|---|
+| `course_style_two_words_ryan_en_ryan_de.wav` | Ryan for English and German | 62.1 s | 02_de (14.9 s), 04_de (5.3 s) |
+| `course_style_two_words_serena_en_serena_de.wav` | Serena for English and German | 57.0 s | 01_en (9.9 s), 03_en (15.1 s), 05_en (12.0 s) |
+
+Both work technically; the voice choice was then settled by the Persian test (4.4).
+
+### 4.4 Persian teacher (`08_persian_teacher_test/`)
+
+**Question:** can the teacher explain in Persian (Farsi) instead of English, with the same voice also reading the German examples?
+
+**Voicebox cannot do this:** Persian (`fa`) is not in its language list. Arabic support in Chatterbox would read Persian text with Arabic pronunciation. Options considered:
+
+| Option | Persian | Same voice in fa + de (+ en) | Notes |
+|---|---|---|---|
+| Voicebox engines (Qwen, Chatterbox, Kokoro) | No | — | `fa` not supported |
+| **Higgs Audio v3 4B** (`bosonai/higgs-audio-v3-tts-4b`, MLX via `mlx_audio`) | Yes; the owner had tried it before with a good result | **Yes**, by cloning one reference voice into every language | Already set up in `~/personal/tts` (own venv, Python 3.12) |
+| Meta MMS-TTS Persian | Yes | No, Persian only | Robotic, single voice |
+| Cloud TTS (Azure, ElevenLabs, OpenAI) | Usually good | Varies | Not local, costs money |
+
+**Setup:**
+
+* Higgs Audio v3 clones a voice from a reference clip plus its exact transcript.
+* As reference, the **Voicebox preset voices' own clips** were used (`07_course_style_test/segments/01_en_ryan.wav` and `01_en_serena.wav`). This keeps one synthetic teacher across languages without cloning a real person's voice.
+* Same five-block course structure as 4.2; Persian blocks written in informal spoken Persian, German blocks unchanged. No vowel marks.
+* Generation settings: `temperature 0.7`, `top_p 0.95`, `top_k 50`, `seed 42`, `max_new_tokens 2048`. Model loaded once for both voices; Voicebox had nothing loaded (one model at a time).
+* Script: `lab_scripts/persian_test.py`.
+
+Persian blocks:
+
+```text
+01_fa: خب، قبل از اینکه گوش دادن رو شروع کنی، بیا دو تا کلمه رو با هم ببینیم. اولی توی همون جمله‌ی اول داستان میاد. گوش کن.
+03_fa: این کلمه یعنی حشره‌ی موذی، یه جور جونور چندش‌آور. پس از همون اول می‌فهمی گرگور به چی تبدیل شده. کلمه‌ی دوم یه کم طولانیه. گرگور می‌ترسه رئیسش با این آدم بیاد.
+05_fa: یعنی پزشکِ بیمه‌ی درمانی. اسم‌های بلند آلمانی معمولاً از چند تا کلمه‌ی کوچیک‌تر ساخته شدن، پس ازشون نترس. خب، از داستان لذت ببر.
+```
+
+**Results:**
+
+| File | Reference voice | Length | Generation time | Owner's verdict |
+|---|---|---|---|---|
+| `persian_teacher_ryan.wav` | Ryan | 59.9 s | ~5 min | Persian okay |
+| `persian_teacher_serena.wav` | Serena | 62.7 s | ~5.5 min | **Excellent, really teacher-like, worth listening to** |
+
+Per block, Higgs needed 30–95 s; Persian blocks were the slowest. Overall it is about 5–6× slower than real time, similar to Qwen CustomVoice in Voicebox.
+
+Owner's observations on the Serena version:
+
+* The voice sounds like a real teacher.
+* Switching Persian → German → Persian works well.
+* German pronunciation is good.
+* The name **Gregor (گرگور) is mispronounced**, by Ryan as well. Persian script does not write short vowels, so the model has to guess. This is accepted as a compromise.
+* **Vowel marks are not the fix:** the owner tried them before on another Persian text and the result got worse. A two-spelling test (گِرِگور / گْرِگور) was generated anyway (`persian_teacher_serena_gregor_*.wav`, script `lab_scripts/persian_fix_gregor.py`), but vowel marking is not part of the plan.
+
+**Decision from this test:** the preferred teacher is **Serena's voice via Higgs Audio v3, explaining in Persian, with the same voice reading the German examples.**
 
 ## 5. Findings
 
@@ -185,6 +251,9 @@ Result file: `07_course_style_test/course_style_two_words.wav`, 58.9 s (24 kHz m
 * **German pronunciation:** Qwen CustomVoice presets with `language de` sound good.
 * **Numbered file per step:** made it easy to inspect, fix and rerun only the later steps.
 * **Loudness matching per part** removes the volume jump between teacher and narrator.
+* **Course-style blocks:** complete sentences in the teacher's language, German as separate blocks (word + real book sentence), per-block loudness, pauses around German.
+* **One synthetic teacher across languages:** Higgs Audio v3 cloning a Voicebox preset clip (Serena) speaks Persian and German convincingly.
+* **Persian teacher:** the owner's favourite result of the whole POC.
 
 ### What does not work (yet)
 
@@ -194,6 +263,9 @@ Result file: `07_course_style_test/course_style_two_words.wav`, 58.9 s (24 kHz m
 * **Delivery instruction scope:** "speak a little slowly" slowed the whole text (143 s instead of ~90 s) and made the tone flat.
 * **German words inside English sentences** are anglicised by an English voice.
 * **Single-word TTS clips** get unpredictable prosody; splicing them mid-sentence sounds broken.
+* **Two different voices** for teacher and examples feel odd.
+* **Foreign names in Persian text** (Gregor) are mispronounced; vowel marks made Persian worse in the owner's earlier experience. Accepted as a compromise.
+* **Filler in the teacher's text** ("enjoy the story", plot explanations) adds length without value.
 
 ### Operational findings
 
@@ -203,6 +275,7 @@ Result file: `07_course_style_test/course_style_two_words.wav`, 58.9 s (24 kHz m
 | Teacher notes, qwen3:8b, no thinking | ~1 min per 10 min section |
 | Teacher notes, qwen3:8b, thinking | ~2.5 min per 10 min section |
 | TTS, Qwen CustomVoice 1.7B, M1 | ~12 min for 143 s of speech (~5× slower than real time) |
+| TTS, Higgs Audio v3 4B (MLX), M1 | ~5–5.5 min for 60 s of speech (~5–6× slower than real time) |
 | Total for one 10-minute section | ~20 minutes, mostly transcription and TTS |
 
 * Voicebox could not decode MP3 in `/transcribe`; WAV works.
@@ -264,7 +337,7 @@ This is the course-style format from 4.2.
 | Option | Description | Status |
 |---|---|---|
 | A | Same voice; English segments in `en`, German in `de` | German pronunciation good; splicing single words mid-sentence fails |
-| B | English teacher voice + separate German voice for examples | **Being tested** (course style, 4.2) |
+| B | English teacher voice + separate German voice for examples | Format works (4.2), but two different voices feel odd; **one voice for all languages chosen** (4.3, 4.4) |
 | C | Cut the narrator's own pronunciation from the audiobook using word timestamps | Not needed for pronunciation quality; still attractive for learning (exact sound the learner will hear). Needs timestamps |
 
 Assembly complexity for B was judged acceptable: the script is a list of segments, each is one TTS call, ffmpeg joins them with pauses (~30 lines of Python). Both voices use the same model, so the one-model constraint holds.
@@ -300,7 +373,8 @@ timed text (from SRT or from Whisper) → sections → briefing (structured, val
 | Prompt and voice experiments | Ad-hoc scripts | **Small Python lab script outside the app** | Fast iteration; only proven steps move into Subinjector |
 | LLM | qwen3:8b, free text | Same port ([ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md)); **structured JSON + validation**; shorter sections; measure `gemma3:12b` and optionally a cloud model | AI output is untrusted; grammar accuracy is the weak spot |
 | Speech-to-text | Voicebox `/transcribe` | **Dedicated Whisper server with timestamps** (whisper.cpp server or mlx-whisper) behind a `TranscriptionProvider` port | Timestamps are required; Voicebox issues (MP3, MLX thread bug) |
-| Text-to-speech | Voicebox `/generate` | **Voicebox behind a `SpeechProvider` port** | Works well; port keeps Kokoro or a cloud provider possible |
+| Text-to-speech | Voicebox `/generate`, then Higgs Audio v3 | **Higgs Audio v3 with a fixed reference clip (Serena), wrapped in a small local Python HTTP service, behind a `SpeechProvider` port** | Only tested local option that speaks Persian and German in one voice; it has no server of its own, unlike Voicebox; the port keeps Voicebox, Kokoro or a cloud provider possible |
+| Teacher voice identity | Voicebox presets | **Reference clip + transcript + seed stored as versioned configuration** | Same teacher across sessions and books |
 | Audio processing | ffmpeg | ffmpeg called from the app | Reliable, already used |
 | Deployment | Laptop | App and PostgreSQL may run on the Pi; **models run on the Mac or a cloud API** | [ADR-007](adr/ADR-007-local-model-sizing.md): the Pi cannot run these models usefully |
 | Audio files | Local folder | Files on disk/object storage, paths in the database | Large binaries do not belong in PostgreSQL |
@@ -315,14 +389,18 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 
 ### Phase 0 — Validate (lab scripts, ~1 week, no Subinjector code)
 
-- [ ] 0.1 Listen to the course-style test (`07_course_style_test/course_style_two_words.wav`) and decide whether the format works.
+- [x] 0.1 Listen to the course-style test and decide whether the format works. **Done:** course style works; one voice for all languages; Persian teacher with Serena via Higgs Audio v3 preferred (sections 4.2–4.4).
 - [ ] 0.2 Combine the POC scripts into one lab script with numbered outputs and a config file (level, section length, voices, instructs).
-- [ ] 0.3 Structured output from the LLM: `items[]` (type, form in text, dictionary form, quote, meaning, why it matters) and `script[]` (segments tagged `en`/`de`), using Ollama's JSON schema format. Add the quote check and retry on failure; strip markup before TTS.
+- [ ] 0.3 Structured output from the LLM: `items[]` (type, form in text, dictionary form, quote, meaning, why it matters) and `script[]` (segments tagged with the teacher language, e.g. `fa`, or `de` for examples), using Ollama's JSON schema format. Add the quote check and retry on failure; strip markup before TTS. Prompt rules against filler: only word, meaning and example; no "enjoy the story", no plot retelling.
 - [ ] 0.4 Compare section lengths (2–3 min vs 10 min) and models (`qwen3:8b` vs `gemma3:12b`, optionally a cloud model). Score by counting wrong or invented items per section.
 - [ ] 0.5 Try a grammar verification call (narrow yes/no question per grammar item) and measure how many wrong labels it catches.
-- [ ] 0.6 Improve teacher tone: test Qwen VoiceDesign (voice from a written description), spoken-style script wording, and instructs without "slowly". Compare 2–3 voices on the same 30-second clip.
-- [ ] 0.7 Restart Voicebox and run the Whisper-based pronunciation check on the German clips (objective score next to the listening verdict).
+- [x] 0.6 Improve teacher tone. **Done:** natural pace without "slowly"; Serena via Higgs Audio v3 judged really teacher-like (section 4.4). Qwen VoiceDesign remains an option if a different voice is ever wanted.
+- [ ] 0.7 Optional: restart Voicebox and run the Whisper-based pronunciation check on the German clips (objective score next to the listening verdict). Lower priority now that the owner has judged pronunciation by ear.
 - [ ] 0.8 **Real use:** generate briefings for all of chapter 1 (~12 sections of ~3 min) and listen over several days. Questions: did I listen to all of them? Did the briefing help me catch the words? Is voice better than reading the notes?
+- [ ] 0.9 Persian script from the LLM: let `qwen3:8b` write the spoken Persian teacher blocks itself (informal spoken style) and compare with `gemma3:12b`. The owner judges naturalness and correctness.
+- [ ] 0.10 Small local Higgs Audio v3 HTTP service (one endpoint: text + language → WAV; fixed Serena reference clip, transcript and seed; model loaded once, unloaded when idle), so the lab script, and later Subinjector, call it like Voicebox.
+- [ ] 0.11 Names in Persian blocks: accept mispronunciation, and add a prompt rule to mention character names sparingly (for example "the main character" instead of repeating Gregor). No vowel marks.
+- [ ] 0.12 Store the teacher voice definition (reference clip, transcript, seed, settings) in one versioned place, so the voice stays identical across runs.
 - [ ] **Go / no-go decision**, recorded as an ADR that updates the product scope.
 
 ### Phase 1 — Text briefing in Subinjector (useful for subtitles immediately)
@@ -342,7 +420,7 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 
 ### Phase 3 — Voice
 
-- [ ] 3.1 ADR: `SpeechProvider` port; Voicebox adapter; voice configuration (English teacher voice, German example voice).
+- [ ] 3.1 ADR: `SpeechProvider` port; Higgs Audio v3 service adapter first (Voicebox as alternative); teacher voice configuration (reference clip, transcript, seed, teacher language).
 - [ ] 3.2 Spec + slice: synthesis job that generates `script[]` segments with caching and per-segment loudness normalisation.
 - [ ] 3.3 Spec + slice: assembly of briefing + section audio into an output package; consider one `.m4b` with chapter markers so any audiobook player can use it.
 - [ ] 3.4 Spec + slice: stage-by-stage scheduling and explicit model unloading.
@@ -364,6 +442,9 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 * Which teacher voice and tone does the learner want to hear every day?
 * Should the German example use the TTS voice or the narrator's own audio?
 * Can the TTS speed on an M1 (~5× slower than real time) be accepted for whole books, or does synthesis need a faster engine or a cloud provider?
+* Can `qwen3:8b` (or `gemma3:12b`) write natural, correct spoken Persian explanations, or does the Persian teacher need a stronger model?
+* Does the teacher language become a per-user setting (Persian, English, …), and does the briefing prompt need one version per teacher language?
+* What licence terms apply to Higgs Audio v3 and to cloning Qwen preset voice output, if the project is ever shared or deployed for others?
 
 ## 11. Appendix: artifacts, commands, prompts
 
@@ -381,8 +462,10 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 | `04_teacher_voice.wav` | Teacher voice (Ryan), 143 s |
 | `05_final.mp3` | Final POC audio, 12:27 |
 | `06_pronunciation_test/` | Pronunciation clips (section 4.1) |
-| `07_course_style_test/` | Course-style test, final file and individual segments (section 4.2) |
-| `lab_scripts/pron_test.py`, `lab_scripts/course_test.py` | Generation scripts for sections 4.1 and 4.2 |
+| `07_course_style_test/` | Course-style tests: mixed voices and single-voice variants, plus cached segments per voice (sections 4.2–4.3) |
+| `08_persian_teacher_test/` | Persian teacher with Higgs Audio v3: Ryan and Serena versions, Gregor spelling variants, segments (section 4.4) |
+| `lab_scripts/pron_test.py`, `lab_scripts/course_test.py` | Generation scripts for sections 4.1–4.3 (`course_test.py <out> <en_voice> <de_voice>`) |
+| `lab_scripts/persian_test.py`, `lab_scripts/persian_fix_gregor.py` | Higgs Audio v3 scripts for section 4.4; run with `~/personal/tts/.venv/bin/python` |
 
 Voicebox profiles created: **German Teacher** (preset Ryan, `qwen_custom_voice`) and **German Word Voice** (preset Serena, `qwen_custom_voice`).
 
