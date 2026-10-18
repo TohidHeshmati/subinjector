@@ -28,6 +28,8 @@ This document records a manual proof of concept that tested whether Subinjector 
 * **Local models only.** No cloud model as corrector in the final product. Of the 15 review fixes, about 10 can be replaced by local data and code (book text instead of the transcript, a lemmatizer and offline dictionary, stricter checks); the remaining meaning and Persian errors need dictionary-grounded explanations and an in-app "wrong / skip" button.
 * **Time-neutral notes.** The teacher says what an item means and how it is used here, never "you will hear" or "you heard", so the briefing can play before or after a part. Detail level, items per part and part length are UI settings.
 
+**Licensing and distribution (sections [10](#10-legal-and-licensing) and [11](#11-distribution-showcase-youtube-and-video)):** LibriVox recordings and public-domain texts are free to cut and publish. The text models (Whisper, gemma) allow production use; **Higgs Audio v3 is non-commercial** except for publishing your own content (YouTube, audiobooks) with an acknowledgment, so a product for others needs Boson's licence or another voice engine. Plan: the product runs locally; a showcase of public-domain books and YouTube channels (English-speaking learners first, then Persian) find the first audience. Recommended video format: on-screen text with word cards, one generated illustration per part, and Shorts made from single items.
+
 ## Contents
 
 1. [Question](#1-question)
@@ -39,8 +41,10 @@ This document records a manual proof of concept that tested whether Subinjector 
 7. [Should we build it?](#7-should-we-build-it)
 8. [Proposed architecture and tech stack](#8-proposed-architecture-and-tech-stack)
 9. [Task list](#9-task-list)
-10. [Open questions](#10-open-questions)
-11. [Appendix: artifacts, commands, prompts](#11-appendix-artifacts-commands-prompts)
+10. [Legal and licensing](#10-legal-and-licensing)
+11. [Distribution: showcase, YouTube and video](#11-distribution-showcase-youtube-and-video)
+12. [Open questions](#12-open-questions)
+13. [Appendix: artifacts, commands, prompts](#13-appendix-artifacts-commands-prompts)
 
 ---
 
@@ -565,6 +569,13 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 - [ ] 0.18 Dictionary-grounded explanations: pass the dictionary meaning to gemma, which only writes the Persian. Then rerun notes → voice → assemble for the full episode and compare with `03_notes_reviewed/` (the quality target).
 - [ ] 0.19 **Friends' feedback:** send the prototype MP3 (ideally from the 0.18 run) to a few Persian-speaking German learners; ask the three questions in 4.6.
 - [x] 0.20 Time-neutral notes. **Done in the prompts** (4.6); the existing notes are already neutral, so before/after only changes the assembly order. Takes effect on the next notes run.
+- [ ] 0.21 Ask Boson (contact@boson.ai) to confirm in writing that the showcase and YouTube channels fall under the Creator Use Grant, and what a local end-user app would need (section 10).
+- [ ] 0.22 English channel prompt: English explanations for English-speaking B1 learners with gemma3:12b; compare on parts 1, 3 and 10 like the Persian test.
+- [ ] 0.23 Sentence translation step (German → English, later Persian) per part, for the translation line in videos.
+- [ ] 0.24 Timestamps: Whisper with word timestamps or forced alignment of the book text (shared with the in-app transcript, 0.15).
+- [ ] 0.25 Video renderer test (option A + E): one part as a 16:9 text video and one item as a 9:16 Short; text frames via headless Chrome.
+- [ ] 0.26 Image test (option B): FLUX.1 [schnell] via `mflux`, one image per part from a gemma-written prompt; measure time per image and judge style consistency.
+- [ ] 0.27 Showcase book list: German public-domain books on LibriVox whose authors died more than 70 years ago, grouped by level.
 - [ ] **Go / no-go decision**, recorded as an ADR that updates the product scope.
 
 ### Phase 1 — Text briefing in Subinjector (useful for subtitles immediately)
@@ -598,7 +609,90 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 - [ ] Learner app (owner's wish list, 4.6): player with the transcript visible (per part first, per sentence once timestamps exist), note taking, a vault for saved words and idioms with Anki export, settings for briefing position, detail, items per part and level.
 - [ ] Reconsider roadmap order: Phase 1 here is useful even if voice is dropped and could come before multi-user and sharing.
 
-## 10. Open questions
+## 10. Legal and licensing
+
+Recorded 2026-10-18. This is a reading of the licence texts, not legal advice. Higgs Audio v3 terms are from the `LICENSE` file shipped with the model (Hugging Face cache, "Last Updated: July 8, 2026"); the others from `ollama show --license`, model cards and project pages.
+
+### Source material
+
+* **Kafka's text** is public domain in Germany and the EU (author died 1924; protection ends 70 years after death).
+* **LibriVox recordings** are dedicated to the public domain by their readers. LibriVox: anyone may use them "however they wish (even to sell them)", including "chop them up, remix them"; no permission or credit required (credit is appreciated). **Cutting the recording in this POC was fine.**
+* Caveat: LibriVox checks copyright **for the USA only**. A German book can be on LibriVox and still protected in Germany (e.g. Hesse, died 1962: protected until 2033). **Rule for anything published: only authors who died more than 70 years ago**, and check translators separately. Safe examples: Kafka, Goethe, Schiller, Brothers Grimm, Fontane, Storm, Schnitzler, Zweig.
+* Project Gutenberg texts (for task 0.15) are public domain once the Gutenberg header and name are removed.
+* Books users bring themselves are their responsibility. The product must not help with infringement: no DRM removal, no marketing like "process your Audible books", processing on the user's machine, no hosting of user uploads.
+
+### Models and tools
+
+| Component | Licence | Production use |
+|---|---|---|
+| Whisper Large v3 | MIT (code) / Apache 2.0 (weights) | Yes |
+| `gemma3:12b` | Gemma Terms of Use | Yes, including commercial; follow Google's prohibited-use policy and pass the terms on if the model itself is distributed |
+| `qwen3:8b` | Apache 2.0 | Yes |
+| `aya-expanse:8b` | CC BY-NC 4.0 + acceptable use addendum | **No** (non-commercial). Only used in the comparison |
+| Qwen3-TTS CustomVoice (Serena, Ryan presets) | Apache 2.0 | Yes; no Persian |
+| Voicebox | MIT (reported) | Yes |
+| **Higgs Audio v3 4B** | **Boson Higgs TTS 3 Research and Non-Commercial License** | **Depends on the use** (below) |
+| ffmpeg | LGPL/GPL | Yes as a separate program; bundling in a distributed app brings obligations |
+| Wiktionary data (task 0.16) | CC BY-SA | Attribution; redistributed dictionary data stays CC BY-SA |
+
+### Higgs Audio v3 in detail
+
+| Use | Allowed? |
+|---|---|
+| Personal use, hobby, research, short-term evaluation (this POC; sending samples to friends) | Yes, free |
+| **Creator Use Grant:** publishing and monetising audio you made ("podcasts, videos, audiobooks, social media posts … ad-supported, sponsored, subscription") on channels you own | Yes, free, with a prominent acknowledgment in the audio or near the top of the description: "This audio was created with Boson AI's Higgs Audio — https://www.boson.ai/higgs-audio" |
+| A free, non-commercial local app where the user installs Higgs | Probably yes: the licence mentions "permitted non-commercial application[s]"; requires the licence copy, a NOTICE file and "Built with Higgs TTS 3 licensed from Boson AI USA, Inc." |
+| Hosted voice generation, an API, or an end-user app that is paid or part of a business ("production use … any use made available to end users outside Your organization") | **No, needs a written commercial licence from Boson** |
+| Cloning a real person's voice | Only with explicit, verifiable consent. Serena is a synthetic Qwen preset; whether it was recorded from a real voice actor is unknown and should be checked before going public |
+| Public synthetic audio | Must be disclosed where people could be misled; label it "AI voice" |
+
+**Consequences:**
+
+* The text side (Whisper, gemma) is clean for any product. **The voice is the licensing risk.** No permissively licensed local Persian TTS of Higgs quality is known; Qwen3-TTS (Apache 2.0) covers English and German.
+* Keep the voice engine behind the planned `SpeechProvider` port, so Higgs can be a user-installed option and can be replaced if the product ever charges money.
+* Confirm the showcase/YouTube reading with Boson in writing before launch (contact@boson.ai), since those videos also advertise a product.
+* EU AI Act transparency rules (in force since August 2026): label AI-generated audio and video.
+
+## 11. Distribution: showcase, YouTube and video
+
+### Plan (owner, 2026-10-18)
+
+* **The product runs locally** on the user's machine; users process books they own.
+* **An online showcase** publishes a few public-domain LibriVox books, prepared for different levels, so people can hear what the tool does.
+* **YouTube** to find the first audience: one channel for English-speaking learners of German (**start here: the bigger market**) and one for Persian speakers. Published videos fall under the Higgs Creator Use Grant; for the English channel, Qwen3-TTS (Apache 2.0) with the original Serena voice is a licence-free alternative that speaks English and German. The channel replaces or extends the friends' test (0.19) with real numbers: watch time, retention around teacher parts, and comments like "can I do this with my own book?".
+* For the owner's own channels, reviewing a section before upload is normal editing; the local-only rule applies to the product, where nobody reviews.
+
+### YouTube-specific points
+
+* Describe the source (LibriVox reader, book) and the AI voice in the description; tick YouTube's "altered or synthetic content" box when in doubt.
+* **Content ID:** other channels upload LibriVox recordings and sometimes claim them. Dispute false claims with the LibriVox page as proof.
+* **Monetisation:** YouTube demonetises mass-produced, repetitive "inauthentic content". A plain audiobook over a still image is at risk; teacher parts and on-screen text make the videos clearly more than a re-upload.
+
+### What we already have for a video
+
+| Material | Status |
+|---|---|
+| Book audio per ~2-minute part, teacher audio blocks, chapter times | Yes |
+| German text per part (Whisper; later the book text, 0.15) | Yes, **without sentence or word timing** |
+| Teacher items: German word, book sentence, explanation | Yes, explanations in **Persian only** |
+| Full translation of the text (English or Persian) | **No.** New step: gemma translates sentence by sentence; for the English channel, explanations also need an English prompt and a quality check (gemma has not been tested in English; qwen3's English grammar notes were wrong) |
+| Sentence or word timestamps | **No.** Needed for karaoke-style text; same gap as "transcript while listening". Options: Whisper with word timestamps (whisper.cpp, mlx-whisper), or forced alignment of the book text to the audio |
+
+Local toolchain check: the installed ffmpeg has `libx264`, VideoToolbox, `zoompan` and `xfade`, but **no `libass` and no `drawtext`**, so it cannot draw text itself. Text frames would be rendered as images first (headless Chrome, already installed, handles Persian right-to-left text correctly; or Pillow with `raqm`), or ffmpeg is rebuilt with `libass`.
+
+### Video options
+
+| Option | What the viewer sees | Local cost on M1 16 GB | Licence | Verdict |
+|---|---|---|---|---|
+| **A. Text video** | German text on screen (current sentence highlighted once timestamps exist), translation line below; during teacher parts a **word card** (word, book sentence, explanation) | Rendering only: minutes per episode | No model | **Core of every video.** Most useful for learners, cheap, and clearly not a plain re-upload |
+| **B. A + one illustration per part** | A, over a generated image per ~2-minute part with a slow pan/zoom (`zoompan`) | One image per part; gemma writes the image prompt from the part's text. Speed to measure (FLUX.1 [schnell] in 4 steps via `mflux` is the candidate) | FLUX.1 [schnell]: Apache 2.0. SDXL: OpenRAIL++ (commercial allowed with use restrictions). **FLUX.1 [dev] is non-commercial; avoid** | **Recommended for YouTube.** Same style prompt for every image; keeping Gregor's look consistent across images is the hard part |
+| **C. Short generated clips** | A few seconds of moving video per part, or a short intro loop | Very slow on 16 GB (estimated many minutes per few seconds of low-resolution video, if it fits at all); not realistic for 50 minutes of video | Wan 2.1/2.2: Apache 2.0. HunyuanVideo: its licence excludes the EU, UK and South Korea. LTX-Video: check terms | Only for intros or Shorts, if at all |
+| **D. Talking teacher avatar** | A generated face lip-syncing the teacher parts | Slow and fragile on M1; some lip-sync tools depend on non-commercial face models | Varies; check each | Later, only if retention data asks for a face |
+| **E. Shorts (9:16)** | One item per Short: word card + book sentence + explanation, about 20–30 s, optionally with the part's image | Rendering only | As A/B | **High value:** one section gives ~40 ready Shorts; Shorts are how new channels get found |
+
+**Recommendation:** A as the base, B for long videos, E for reach. Skip C and D until the channel shows people stay.
+
+## 12. Open questions
 
 * Is a spoken briefing clearly better than a written one for this learner? (Phase 0.8)
 * What section length works best for the learner, and for the LLM?
@@ -612,9 +706,11 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 * Do other learners want this? (0.19)
 * Briefing before or after the part: which do learners prefer, or should it stay a setting?
 * Does the teacher language become a per-user setting (Persian, English, …), and does the briefing prompt need one version per teacher language?
-* What licence terms apply to Higgs Audio v3 and to cloning Qwen preset voice output, if the project is ever shared or deployed for others?
+* What licence terms apply to Higgs Audio v3 and to cloning Qwen preset voice output? Mostly answered (section 10): personal use and own channels are fine; a product for others needs Boson's commercial licence. Open: Boson's written confirmation (0.21), and whether the Serena preset is based on a real voice actor.
+* Which video format keeps viewers: text only, text + illustrations, or Shorts? (section 11)
+* Is gemma3:12b good enough for English explanations and sentence translations? (0.22, 0.23)
 
-## 11. Appendix: artifacts, commands, prompts
+## 13. Appendix: artifacts, commands, prompts
 
 ### Files (`~/personal/verwandlung voices/`)
 
