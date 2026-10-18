@@ -1,10 +1,27 @@
 # Audiobook teacher-voice proof of concept
 
-* **Date:** 2026-10-17
-* **Status:** Proof of concept done, including a Persian teacher voice; validation phase (Phase 0 below) in progress
+* **Date:** 2026-10-17 (full-episode run during the night of 2026-10-17/18)
+* **Status:** Proof of concept done, including a Persian teacher voice and a complete 41-minute episode with 21 briefings; real-use listening (Phase 0.8) pending
 * **Related:** [Roadmap — Phase 6: Audiobook pipeline](../ROADMAP.md), [ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md), [ADR-007](adr/ADR-007-local-model-sizing.md), [Product overview](product.md)
 
 This document records a manual proof of concept that tested whether Subinjector should grow from subtitles into audiobooks with a spoken "teacher" briefing. It covers what was built, every result and failure, the decisions made in discussion, and the proposed task list. No application code was written; everything ran as shell commands and small Python scripts outside this repository.
+
+## Summary
+
+**Result:** a complete, listenable product exists. The first section of *Die Verwandlung* (41 min) now comes with a short Persian teacher briefing before every ~2 minutes: 52.7 minutes in total, 21 chapters, one consistent teacher voice (Serena, Higgs Audio v3) that explains in Persian and reads each German example from the book. It was produced end to end on an M1 with 16 GB, entirely locally, one model at a time, in about 2.5 hours of compute ([section 4.5](#45-full-episode-run-09_full_episode)).
+
+**What the full run proved:**
+
+| Part | Verdict | Evidence |
+|---|---|---|
+| Voice | **Solved** | Owner: Serena is "excellent, really teacher-like". German blocks re-transcribed by Whisper: 38 of 39 at ≥ 90 % similarity, median 99 % |
+| Format | **Solved** | Course style: German word + real book sentence, then Persian explanation; same voice; per-block loudness; chapters per part |
+| Transcription | **Works with a check** | Whisper Large looped or lost punctuation on 5 of 21 parts; an automatic check plus split-in-halves repair fixed all 5 |
+| Teacher notes, fully automatic | **Good, not yet trustworthy alone** | `gemma3:12b` + review step: about 35 of 41 items correct with natural spoken Persian; 4 clearly wrong (two taught Whisper errors as words) and a few small form errors |
+| Teacher notes, after a ~10-minute human review | **Ready to use** | 15 small fixes, listed in `03_notes_reviewed/REVIEW_CHANGES.md` |
+| Model choice | **Decided** | `qwen3:8b` writes broken Persian; `aya-expanse:8b` fluent but formal and breaks format; `gemma3:12b` clearly best |
+
+**Recommendation:** build it, in the order of [section 9](#9-task-list): briefing first, then audio input, then voice. Design it with the four safeguards this run showed are necessary: transcript check, quotes snapped to the source text, a same-model review step, and a voice check with retry. Keep a quick **human review of the notes** in the product flow until a stronger model (or a dictionary tool) removes the last errors. The remaining unknown is not technical: listen to the episode over several days (task 0.8).
 
 ## Contents
 
@@ -83,7 +100,7 @@ All outputs are numbered and stored in `~/personal/verwandlung voices/`, so each
 * **First attempt failed:** Voicebox `/transcribe` rejected the MP3 with `{"detail":"could not open/decode file"}`.
 * **Fix:** convert to 16 kHz mono WAV (Whisper's native format, 19.3 MB) and send that with `language=de`, `model=large`.
 * Time: **5 min 17 s** for 10 minutes of audio (about 0.5× real time).
-* Result: 1,504 words of German. Quality is very good. Small errors found while reading:
+* Result: 1,504 words of German. Quality looked very good when read; **correction from the full run (4.5):** an automatic check later found a Whisper loop in this transcript ("nachher" repeated 10 times) that had been missed by eye. Small errors found while reading:
   * `Nahheiten … vergaße` instead of `Narrheiten … vergäße`
   * `zappelten Beine` instead of `zappelnden Beine`
   * `Bogenförmigen` capitalised
@@ -243,12 +260,94 @@ Owner's observations on the Serena version:
 
 **Decision from this test:** the preferred teacher is **Serena's voice via Higgs Audio v3, explaining in Persian, with the same voice reading the German examples, and with vowel marks on foreign names only.** Best result so far: `persian_teacher_serena_gregor_a_geregor.wav`.
 
+### 4.5 Full episode run (`09_full_episode/`)
+
+**Goal:** a better test than one minute of audio: the whole first section (41:06), with a short teacher briefing before every ~2 minutes, produced automatically by one pipeline. Owner's constraint: strictly one model at a time.
+
+**Pipeline:** `lab_scripts/episode_pipeline.py` with five stages, each started separately: `split → transcribe → notes → voice → assemble`. Every stage that uses a model first checks that nothing is loaded in Voicebox or Ollama, and unloads its model at the end. Every stage writes files and skips work that already exists, so any stage can be rerun safely.
+
+#### Split
+
+* `silencedetect` (−35 dB, ≥ 0.5 s) over the whole file; for every 120 s target, the longest pause within ±25 s.
+* Result: **21 parts of 98–139 s** (last one 69 s). Part 5 ends at 10:02.0, the same cut as the first excerpt.
+
+#### Transcribe
+
+* Each part transcribed separately with Whisper Large (Voicebox), so no timestamps are needed.
+* Voicebox first had to be restarted: its transcription still failed with the MLX thread error. The app quit, but its server stayed alive as an orphan process and answered `Broken pipe`; stopping the orphan and starting Voicebox again fixed it.
+* **First pass: 5 of 21 parts were broken** — a word repeated 70, 155, 73 and 14 times in a row ("lieber lieber lieber…"), and one part with no punctuation at all. Re-checking the earlier 10-minute transcript showed the same failure there ("nachher" ×10), which had been missed by eye.
+* **Fix:** an automatic check (a word repeated ≥ 5 times in a row, or almost no punctuation) and a repair that splits a failed part at the pause nearest its middle and transcribes the halves (up to two levels). All 5 parts passed after repair. Total 6,060 words.
+* Time: 23.6 min first pass, 20.4 min repair.
+
+#### Notes
+
+The notes stage asks for structured JSON (Ollama JSON schema): per item `type`, `german` (dictionary form), `quote` (exact text), `explanation_fa` (one or two sentences of spoken Persian). Code validates every item; failed answers are retried up to three times with the reasons.
+
+Problems found and fixed during the run:
+
+| Problem | Fix |
+|---|---|
+| Exact quote check rejected good items: the model wrote "er fand sich" where the book says "fand er sich" | **Quote snapping:** find the most similar passage of the part (≥ 80 % similar, `difflib`) and use the real book text; prefer the longest near-equal match and trim fragments that spill over a sentence boundary. Invented quotes are still rejected |
+| A quote that does not contain the item (qwen: *sich eine passende Ausrede finden* with an unrelated sentence) | Check that a content word of the item appears in the quote (first five letters, also with separable "zu"/"ge" removed) |
+| The model copied the style example's ending into almost every explanation | Shorter example and "do not copy its wording" |
+| Random sentence fragments and transcription errors chosen as items | Prompt: only dictionary words or fixed expressions; skip words that look like recognition errors; plus the review step |
+
+**First full run with `qwen3:8b`** (kept in `03_notes_qwen3_8b/`): 39 items, but about a third to half of the Persian explanations were wrong or garbled (invented word "پانچره" for *panzerartig*, "فجایع" in a nonsense sentence, wrong meanings), plus invented dictionary forms and a fixation on "sich …" items. Not voiced.
+
+**Model comparison** on parts 1, 3 and 10 (`03_notes_compare/compare.md`, same prompt and checks for all):
+
+| Model | Persian | Format discipline | Verdict |
+|---|---|---|---|
+| `qwen3:8b` | Often broken, invented words | Good | Not usable for Persian |
+| `aya-expanse:8b` | Fluent and mostly correct, but formal written style despite the instruction | Poor: whole paragraphs as quotes, German inside the Persian (part 3 failed) | Second |
+| `gemma3:12b` | **Natural spoken Persian, mostly correct meanings** | Good | **Chosen** |
+
+**Review step** (same model, second call): the model first proposes three candidates; the review keeps the best two, writes dictionary forms, drops fragments and transcription errors, and rewrites wrong or unnatural Persian. The result goes through the same code checks; if it fails, the original items are used. This fixed *panzerartig* ("سفت و محکم مثل زره") and removed two bad candidates in the 3-part test.
+
+**Full run with `gemma3:12b` + review:** 41 items for 21 parts in 38 min; 17 of 21 parts valid on the first attempt; review used in every part. Assessment by reading all 41:
+
+* **About 35 good**, for example *um keinen Preis* → "یعنی به هیچ وجه، اصلاً!", *den Kopf verlieren*, *geschehe was wolle*, *die Zugluft*, *nichts im Kopf haben*, *vor Gewissensbissen närrisch werden*.
+* **4 clearly wrong:** *die Nahheiten* and *erschütternde* (Whisper errors for *Narrheiten* and *möbelerschütternde Läuten*, taught as words), *unter vier Augen* (garbled phrase), *aus den Augen, aus dem Sinn* (proverb not in the text).
+* **Small issues:** wrong articles (*der Hindernis*, *die Versäumnis*), non-dictionary forms (*ausstieß*), *Rücksicht* chosen twice in different forms.
+
+#### Two versions
+
+* **Automatic** (`03_notes/`): exactly the pipeline's output, as the honest measurement.
+* **Reviewed** (`03_notes_reviewed/`, `lab_scripts/make_reviewed_notes.py`): 15 explicit fixes (2 items removed, 13 corrected), each with its reason in `REVIEW_CHANGES.md` and in the section file. Quotes are still validated against the transcript by code. This models the human check recommended for the product. 39 items.
+
+#### Voice
+
+* Higgs Audio v3 with Serena's reference clip, one block per German example (word + quote) and one per Persian explanation; vowel-marked spellings applied to names.
+* Blocks are named by a fingerprint of their text, so both versions share identical blocks and an edit never reuses stale audio. The reviewed version needed only 19 extra blocks.
+* **Higgs failure found:** some blocks were about one second of speech followed by silence up to the 25 s limit. A check on every block (silence > 40 % of the block, or far too long or short for its text at 0.092 s per character) now regenerates with another seed. It caught **5 failures in about 100 blocks, all German blocks, all fixed on the second seed.**
+* Time: 46 min for the first 82 blocks (11.7 min of teacher audio), 19 min for fixes and the reviewed version.
+
+#### Assemble and checks
+
+* Per part: blocks with 0.5 s after German and 0.9 s after Persian, 1 s before the narrator, then the two minutes of the book. Every block and every narrator part loudness-normalised on its own.
+* Outputs: MP3, and M4B with 21 chapters ("Teil 1"–"Teil 21") for audiobook players; `teacher_notes_*.md` with every item and its position in the file.
+* **Reviewed: 52.7 min; automatic: 53.4 min** (41.1 min book + ~11.5 min teacher).
+* Loudness: teacher blocks −15 to −17 LUFS, narrator −17 LUFS.
+* **Objective German check** (`lab_scripts/check_german_blocks.py`): Whisper re-transcribed all 39 German blocks of the reviewed version; **38 of 39 ≥ 90 % similar to the intended text, median 99 %, lowest 82 %** (correct words; Whisper added an invented ending after a quote that stops mid-sentence).
+
+#### Total compute for one 41-minute section (M1, 16 GB, local)
+
+| Stage | Time |
+|---|---|
+| Transcription (incl. repair) | 44 min |
+| Notes, gemma3:12b + review | 38 min |
+| Voice (82 blocks + retries) | ~50 min |
+| Assemble and checks | ~5 min |
+| **Total** | **~2.3 h**, i.e. an overnight job per book section |
+
 ## 5. Findings
 
 ### What works
 
-* **Transcription:** Whisper Large gives accurate German without tuning.
-* **Word selection by the LLM:** `qwen3:8b` chose useful, relevant words (*Ungeziefer*, *zappeln*, *Krankenkassenarzt*) and mostly translated them well.
+* **Transcription:** Whisper Large gives accurate German **when checked**: it loops or drops punctuation on roughly a quarter of 2-minute parts, which an automatic check and split-in-halves repair fix (4.5).
+* **Word selection by the LLM:** all models chose useful, relevant words; `gemma3:12b` with a review step also writes natural, mostly correct spoken Persian (4.5).
+* **Full automation end to end:** 41 minutes of audiobook to a 53-minute episode with 21 briefings, locally, one model at a time, in ~2.3 h (4.5).
+* **Code safeguards around AI output:** quote snapping to the source text, item-in-quote check, transcript check, voice silence check with retry; each caught real failures in the run.
 * **German pronunciation:** Qwen CustomVoice presets with `language de` sound good.
 * **Numbered file per step:** made it easy to inspect, fix and rerun only the later steps.
 * **Loudness matching per part** removes the volume jump between teacher and narrator.
@@ -266,7 +365,10 @@ Owner's observations on the Serena version:
 * **Single-word TTS clips** get unpredictable prosody; splicing them mid-sentence sounds broken.
 * **Two different voices** for teacher and examples feel odd.
 * **Foreign names in plain Persian text** (Gregor) are mispronounced. Fixed by vowel-marking the name only (گِرِگور); vowel-marking the whole text made Persian worse in the owner's earlier experience.
-* **Filler in the teacher's text** ("enjoy the story", plot explanations) adds length without value.
+* **Filler in the teacher's text** ("enjoy the story", plot explanations) adds length without value. (Fixed in the full run by the structured format: only word, quote and explanation.)
+* **Small local models in Persian:** `qwen3:8b` writes broken Persian; even `gemma3:12b` + review leaves about 10 % clearly wrong items.
+* **Transcription errors propagate:** the LLM taught two Whisper mistakes as German words. Without a dictionary check, only a human review catches this.
+* **Higgs occasionally stops speaking** after a second and fills the block with silence (~5 % of blocks, German only); a check with retry is required.
 
 ### Operational findings
 
@@ -278,6 +380,9 @@ Owner's observations on the Serena version:
 | TTS, Qwen CustomVoice 1.7B, M1 | ~12 min for 143 s of speech (~5× slower than real time) |
 | TTS, Higgs Audio v3 4B (MLX), M1 | ~5–5.5 min for 60 s of speech (~5–6× slower than real time) |
 | Total for one 10-minute section | ~20 minutes, mostly transcription and TTS |
+| Notes, gemma3:12b + review, per 2-minute part | ~1.5–3 min (38 min for 21 parts) |
+| TTS, Higgs Audio v3, per block | ~25–50 s (~4× slower than real time) |
+| **Full 41-minute section, all stages** | **~2.3 h** |
 
 * Voicebox could not decode MP3 in `/transcribe`; WAV works.
 * Voicebox `/transcribe` returns no timestamps.
@@ -345,18 +450,20 @@ Assembly complexity for B was judged acceptable: the script is a list of segment
 
 ## 7. Should we build it?
 
-**Recommendation: yes, but not as Subinjector code yet.** Validate first with lab scripts, then build the shared core (the briefing) before anything audio-specific.
+**Recommendation after the full-episode run: yes, build it.** The technical risks are retired: a complete episode was produced automatically, locally, with a voice the owner likes and German examples Whisper confirms at a 99 % median. Build the shared core (the briefing) first, then audio input, then voice, with the safeguards from 4.5 and a human review step for the notes.
 
 **For:**
 
-* Every step of the pipeline works in principle.
-* It matches the planned architecture (Roadmap Phase 6: transcription job → enrichment job → synthesis job).
+* The whole pipeline works end to end on the target hardware (4.5), within an overnight run per section.
+* It matches the planned architecture (Roadmap Phase 6: transcription job → enrichment job → synthesis job), and the lab script already has the stage structure, file-per-stage outputs and caching the product needs.
+* Every failure found had a cheap, testable code fix; none required a different architecture.
 
 **Against / risks:**
 
-* The briefing has been listened to once. A listening tool is only worth building if it is used repeatedly.
-* Voice is the most expensive part (TTS time, assembly, voices). A **text** briefing before listening may give most of the value at a fraction of the cost. Untested.
-* The subtitle MVP is unfinished (exports missing), and [the product overview](product.md) lists audiobook processing as an MVP non-goal. Two half-finished pipelines are a real risk.
+* The full episode has not yet been used for real learning. Listening over several days (0.8) is the remaining go/no-go test.
+* Notes are not fully trustworthy without a human check (~10 % clearly wrong with the best local model). The product needs an editable review step, or a stronger model or dictionary tool.
+* Voice is the most expensive part (~50 min per 41 min of audio). A **text** briefing may give much of the value at a fraction of the cost; still untested.
+* The subtitle MVP is unfinished (exports missing), and [the product overview](product.md) lists audiobook processing as an MVP non-goal. Two half-finished pipelines are a real risk; the briefing-first order reduces it.
 
 **Key insight:** the valuable new element is the **briefing** ("before this section, watch out for these things"), not the audio. A briefing also helps subtitle users, for example before watching an episode. Building it first benefits both paths:
 
@@ -372,8 +479,9 @@ timed text (from SRT or from Whisper) → sections → briefing (structured, val
 |---|---|---|---|
 | Orchestration, jobs, API, storage | Shell + Python | **Keep Kotlin / Spring Boot / PostgreSQL** | Portfolio goal; durable job system already exists |
 | Prompt and voice experiments | Ad-hoc scripts | **Small Python lab script outside the app** | Fast iteration; only proven steps move into Subinjector |
-| LLM | qwen3:8b, free text | Same port ([ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md)); **structured JSON + validation**; shorter sections; measure `gemma3:12b` and optionally a cloud model | AI output is untrusted; grammar accuracy is the weak spot |
-| Speech-to-text | Voicebox `/transcribe` | **Dedicated Whisper server with timestamps** (whisper.cpp server or mlx-whisper) behind a `TranscriptionProvider` port | Timestamps are required; Voicebox issues (MP3, MLX thread bug) |
+| LLM | qwen3:8b free text, then gemma3:12b structured | Same port ([ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md)); **`gemma3:12b`, structured JSON, ~2-minute sections, 3 candidates + same-model review, code validation with quote snapping**; cloud model as an option | Measured in 4.5: best local Persian; AI output is untrusted |
+| Human review | — | **Editable notes before voicing** (a review endpoint or UI); only changed blocks are re-synthesised | ~10 % of automatic items were clearly wrong |
+| Speech-to-text | Voicebox `/transcribe` | **Dedicated Whisper server with timestamps** (whisper.cpp server or mlx-whisper) behind a `TranscriptionProvider` port, **with a loop/punctuation check and split-and-retry** | Timestamps are required; Voicebox issues (MP3, MLX thread bug, orphaned server); Whisper Large looped on 5 of 21 parts |
 | Text-to-speech | Voicebox `/generate`, then Higgs Audio v3 | **Higgs Audio v3 with a fixed reference clip (Serena), wrapped in a small local Python HTTP service, behind a `SpeechProvider` port** | Only tested local option that speaks Persian and German in one voice; it has no server of its own, unlike Voicebox; the port keeps Voicebox, Kokoro or a cloud provider possible |
 | Teacher voice identity | Voicebox presets | **Reference clip + transcript + seed stored as versioned configuration** | Same teacher across sessions and books |
 | Audio processing | ffmpeg | ffmpeg called from the app | Reliable, already used |
@@ -391,17 +499,19 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 ### Phase 0 — Validate (lab scripts, ~1 week, no Subinjector code)
 
 - [x] 0.1 Listen to the course-style test and decide whether the format works. **Done:** course style works; one voice for all languages; Persian teacher with Serena via Higgs Audio v3 preferred (sections 4.2–4.4).
-- [ ] 0.2 Combine the POC scripts into one lab script with numbered outputs and a config file (level, section length, voices, instructs).
-- [ ] 0.3 Structured output from the LLM: `items[]` (type, form in text, dictionary form, quote, meaning, why it matters) and `script[]` (segments tagged with the teacher language, e.g. `fa`, or `de` for examples), using Ollama's JSON schema format. Add the quote check and retry on failure; strip markup before TTS. Prompt rules against filler: only word, meaning and example; no "enjoy the story", no plot retelling.
-- [ ] 0.4 Compare section lengths (2–3 min vs 10 min) and models (`qwen3:8b` vs `gemma3:12b`, optionally a cloud model). Score by counting wrong or invented items per section.
-- [ ] 0.5 Try a grammar verification call (narrow yes/no question per grammar item) and measure how many wrong labels it catches.
+- [x] 0.2 Combine the POC scripts into one lab script with numbered outputs. **Done:** `lab_scripts/episode_pipeline.py`, five stages, cached outputs, one model at a time (4.5). A separate config file is still open; settings are constants at the top of the script.
+- [x] 0.3 Structured output from the LLM with validation and retry. **Done** (4.5): `items[]` via Ollama JSON schema; quote snapping, item-in-quote check, Latin-letter and Persian checks; the spoken script is built from the items by a template, so there is no filler.
+- [x] 0.4 Compare models. **Done** (4.5): `gemma3:12b` chosen over `aya-expanse:8b` and `qwen3:8b`; ~2-minute sections used. A cloud model was not tested.
+- [ ] 0.5 Try a grammar verification call (narrow yes/no question per grammar item). Less urgent: with the dictionary-item rule, the model chose almost no grammar items in the full run.
 - [x] 0.6 Improve teacher tone. **Done:** natural pace without "slowly"; Serena via Higgs Audio v3 judged really teacher-like (section 4.4). Qwen VoiceDesign remains an option if a different voice is ever wanted.
-- [ ] 0.7 Optional: restart Voicebox and run the Whisper-based pronunciation check on the German clips (objective score next to the listening verdict). Lower priority now that the owner has judged pronunciation by ear.
-- [ ] 0.8 **Real use:** generate briefings for all of chapter 1 (~12 sections of ~3 min) and listen over several days. Questions: did I listen to all of them? Did the briefing help me catch the words? Is voice better than reading the notes?
-- [ ] 0.9 Persian script from the LLM: let `qwen3:8b` write the spoken Persian teacher blocks itself (informal spoken style) and compare with `gemma3:12b`. The owner judges naturalness and correctness.
+- [x] 0.7 Whisper-based check of the German voice blocks. **Done** (4.5): 38 of 39 ≥ 90 %, median 99 % (`lab_scripts/check_german_blocks.py`).
+- [ ] 0.8 **Real use:** the episode is generated (`09_full_episode/05_output/verwandlung_01_with_teacher_reviewed.m4b`, 21 parts of ~2 min). **Remaining:** listen over several days. Questions: did I listen to all of it? Did the briefing help me catch the words? Is voice better than reading `teacher_notes_reviewed.md`? Are two items per part the right amount?
+- [x] 0.9 Persian script from the LLM. **Done** (4.5): the LLM writes each explanation in spoken Persian; `gemma3:12b` + review is natural and mostly correct; the owner should still judge the Persian of the final episode.
 - [ ] 0.10 Small local Higgs Audio v3 HTTP service (one endpoint: text + language → WAV; fixed Serena reference clip, transcript and seed; model loaded once, unloaded when idle), so the lab script, and later Subinjector, call it like Voicebox.
-- [ ] 0.11 Names in Persian blocks: keep a small per-book list of vowel-marked spellings for character and place names (e.g. Gregor → گِرِگور) and apply it to the Persian script before TTS, or ask the LLM to vowel-mark names only. Never vowel-mark the whole text. Also mention names sparingly.
-- [ ] 0.12 Store the teacher voice definition (reference clip, transcript, seed, settings) in one versioned place, so the voice stays identical across runs.
+- [x] 0.11 Names in Persian blocks. **Done:** per-book spelling list applied before TTS (`PERSIAN_NAME_SPELLINGS`: Gregor → گِرِگور, Grete → گِرِته); the prompt also excludes proper names as items.
+- [ ] 0.12 Store the teacher voice definition (reference clip, transcript, seed, settings) in one versioned place. Partly done: constants in the lab script; still to move into a config file.
+- [ ] 0.13 Decide how the human review of notes works in the product (edit JSON, a small review page, or approve/reject per item), based on the 15 fixes in `REVIEW_CHANGES.md`.
+- [ ] 0.14 Shorten quotes that end mid-sentence (e.g. "…imstande war, das"), so the German example always ends naturally.
 - [ ] **Go / no-go decision**, recorded as an ADR that updates the product scope.
 
 ### Phase 1 — Text briefing in Subinjector (useful for subtitles immediately)
@@ -439,11 +549,12 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 * Is a spoken briefing clearly better than a written one for this learner? (Phase 0.8)
 * What section length works best for the learner, and for the LLM?
 * How many items per section before the briefing becomes too long to remember?
-* Is `gemma3:12b` accurate enough on grammar, or is a verification step or cloud model required?
+* Is `gemma3:12b` accurate enough? Partly answered: ~35 of 41 items good; the rest needs a human review, a dictionary tool or a stronger (cloud) model. Which of these is the product default?
 * Which teacher voice and tone does the learner want to hear every day?
 * Should the German example use the TTS voice or the narrator's own audio?
 * Can the TTS speed on an M1 (~5× slower than real time) be accepted for whole books, or does synthesis need a faster engine or a cloud provider?
-* Can `qwen3:8b` (or `gemma3:12b`) write natural, correct spoken Persian explanations, or does the Persian teacher need a stronger model?
+* Can a local model write natural, correct spoken Persian? Answered: `qwen3:8b` no; `gemma3:12b` with a review step mostly yes (4.5).
+* Can transcription errors be caught before the LLM teaches them, e.g. with a German word list check on chosen items?
 * Does the teacher language become a per-user setting (Persian, English, …), and does the briefing prompt need one version per teacher language?
 * What licence terms apply to Higgs Audio v3 and to cloning Qwen preset voice output, if the project is ever shared or deployed for others?
 
@@ -465,8 +576,11 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 | `06_pronunciation_test/` | Pronunciation clips (section 4.1) |
 | `07_course_style_test/` | Course-style tests: mixed voices and single-voice variants, plus cached segments per voice (sections 4.2–4.3) |
 | `08_persian_teacher_test/` | Persian teacher with Higgs Audio v3: Ryan and Serena versions, Gregor spelling variants, segments (section 4.4) |
+| `09_full_episode/` | Full-episode run (section 4.5): sections, transcripts, notes (automatic, reviewed, qwen, comparison), voice blocks, final MP3/M4B and notes; own `README.md` |
 | `lab_scripts/pron_test.py`, `lab_scripts/course_test.py` | Generation scripts for sections 4.1–4.3 (`course_test.py <out> <en_voice> <de_voice>`) |
 | `lab_scripts/persian_test.py`, `lab_scripts/persian_fix_gregor.py` | Higgs Audio v3 scripts for section 4.4; run with `~/personal/tts/.venv/bin/python` |
+| `lab_scripts/episode_pipeline.py` | Full-episode pipeline: `split`, `transcribe`, `notes`, `voice [notes dir]`, `assemble [notes dir]`, `compare <model>`, `compare_report` |
+| `lab_scripts/make_reviewed_notes.py`, `lab_scripts/check_german_blocks.py` | Human-review fixes for the notes; Whisper check of the German voice blocks |
 
 Voicebox profiles created: **German Teacher** (preset Ryan, `qwen_custom_voice`) and **German Word Voice** (preset Serena, `qwen_custom_voice`).
 
