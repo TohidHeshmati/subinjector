@@ -1,7 +1,7 @@
 # Audiobook teacher-voice proof of concept
 
-* **Date:** 2026-10-17 (full-episode run during the night of 2026-10-17/18)
-* **Status:** Proof of concept done, including a Persian teacher voice and a complete 41-minute episode with 21 briefings; real-use listening (Phase 0.8) pending
+* **Date:** 2026-10-17 (full-episode run during the night of 2026-10-17/18; owner feedback and product direction 2026-10-18)
+* **Status:** Proof of concept done, including a Persian teacher voice and a complete 41-minute episode with 21 briefings. Owner's verdict: "really good", would use it as a product. Next: feedback from a few friends (0.19) and a local-only improved run (0.15–0.18)
 * **Related:** [Roadmap — Phase 6: Audiobook pipeline](../ROADMAP.md), [ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md), [ADR-007](adr/ADR-007-local-model-sizing.md), [Product overview](product.md)
 
 This document records a manual proof of concept that tested whether Subinjector should grow from subtitles into audiobooks with a spoken "teacher" briefing. It covers what was built, every result and failure, the decisions made in discussion, and the proposed task list. No application code was written; everything ran as shell commands and small Python scripts outside this repository.
@@ -18,10 +18,15 @@ This document records a manual proof of concept that tested whether Subinjector 
 | Format | **Solved** | Course style: German word + real book sentence, then Persian explanation; same voice; per-block loudness; chapters per part |
 | Transcription | **Works with a check** | Whisper Large looped or lost punctuation on 5 of 21 parts; an automatic check plus split-in-halves repair fixed all 5 |
 | Teacher notes, fully automatic | **Good, not yet trustworthy alone** | `gemma3:12b` + review step: about 35 of 41 items correct with natural spoken Persian; 4 clearly wrong (two taught Whisper errors as words) and a few small form errors |
-| Teacher notes, after a ~10-minute human review | **Ready to use** | 15 small fixes, listed in `03_notes_reviewed/REVIEW_CHANGES.md` |
+| Teacher notes, after a ~10-minute review | **Ready to use** | 15 small fixes, listed in `03_notes_reviewed/REVIEW_CHANGES.md`. The review was done by Claude (cloud), standing in for a human; the product must not depend on it ([section 6](#local-models-only-can-the-pipeline-correct-itself)) |
 | Model choice | **Decided** | `qwen3:8b` writes broken Persian; `aya-expanse:8b` fluent but formal and breaks format; `gemma3:12b` clearly best |
 
-**Recommendation:** build it, in the order of [section 9](#9-task-list): briefing first, then audio input, then voice. Design it with the four safeguards this run showed are necessary: transcript check, quotes snapped to the source text, a same-model review step, and a voice check with retry. Keep a quick **human review of the notes** in the product flow until a stronger model (or a dictionary tool) removes the last errors. The remaining unknown is not technical: listen to the episode over several days (task 0.8).
+**Recommendation:** build it, in the order of [section 9](#9-task-list): briefing first, then audio input, then voice. Design it with the four safeguards this run showed are necessary: transcript check, quotes snapped to the source text, a same-model review step, and a voice check with retry.
+
+**Owner's verdict on the full episode (2026-10-18):** "really good"; with a good UI the owner would love to use it. Two product rules follow ([section 4.6](#46-owners-verdict-on-the-full-episode-and-product-direction)):
+
+* **Local models only.** No cloud model as corrector in the final product. Of the 15 review fixes, about 10 can be replaced by local data and code (book text instead of the transcript, a lemmatizer and offline dictionary, stricter checks); the remaining meaning and Persian errors need dictionary-grounded explanations and an in-app "wrong / skip" button.
+* **Time-neutral notes.** The teacher says what an item means and how it is used here, never "you will hear" or "you heard", so the briefing can play before or after a part. Detail level, items per part and part length are UI settings.
 
 ## Contents
 
@@ -313,7 +318,7 @@ Problems found and fixed during the run:
 #### Two versions
 
 * **Automatic** (`03_notes/`): exactly the pipeline's output, as the honest measurement.
-* **Reviewed** (`03_notes_reviewed/`, `lab_scripts/make_reviewed_notes.py`): 15 explicit fixes (2 items removed, 13 corrected), each with its reason in `REVIEW_CHANGES.md` and in the section file. Quotes are still validated against the transcript by code. This models the human check recommended for the product. 39 items.
+* **Reviewed** (`03_notes_reviewed/`, `lab_scripts/make_reviewed_notes.py`): 15 explicit fixes (2 items removed, 13 corrected), each with its reason in `REVIEW_CHANGES.md` and in the section file. Quotes are still validated against the transcript by code. 39 items. **The fixes were written by Claude (cloud), not by a person or a local model**; this version shows the quality a review can reach, not what the local pipeline produces alone. See [section 4.6](#46-owners-verdict-on-the-full-episode-and-product-direction) for how to replace it locally.
 
 #### Voice
 
@@ -339,6 +344,34 @@ Problems found and fixed during the run:
 | Voice (82 blocks + retries) | ~50 min |
 | Assemble and checks | ~5 min |
 | **Total** | **~2.3 h**, i.e. an overnight job per book section |
+
+### 4.6 Owner's verdict on the full episode and product direction
+
+**Verdict (2026-10-18, after listening):** "it is actually really good". With a final product with a good UI, the owner "would really love to use it".
+
+**What the owner wants from a product:**
+
+| Wish | Effort, given what the pipeline already produces |
+|---|---|
+| Briefing **before or after** the part, switchable | Order in the assemble step only, if notes are time-neutral (below) |
+| **More or less detail** (items per part, explanation length, grammar or not) | Prompt parameters; treated as UI settings, adjustable later |
+| **Adjusted to the learner's level** | Level is already a prompt parameter (B1); a change regenerates notes and voice, not transcripts |
+| **Transcript visible while listening** | Per part: available now (one transcript per ~2-minute part). Per sentence or word: needs timestamps, which Voicebox's Whisper does not return (whisper.cpp, faster-whisper or forced alignment) |
+| **Save words and idioms to a vault** | Every item is already structured: word, real book sentence, Persian explanation, time in the file. Saving is a button; Anki export is easy |
+| **Note taking** while listening | UI work; nothing in the pipeline blocks it |
+
+**Product rule 1: local models only.** The final product cannot use Claude, or any cloud model, as a corrector. The reviewed version in 4.5 is therefore a quality target, not the product. How the 15 fixes map to local replacements is analysed in [section 6](#local-models-only-can-the-pipeline-correct-itself).
+
+**Product rule 2: time-neutral notes.** If the teacher never says "you will hear" or "you just heard", but only "*X* means *Y*; here it …", the same briefing works before or after the part, and the position becomes a setting.
+
+* **Check of the existing notes:** none of the 41 automatic explanations refers to the future or the past. Only 2 contain "اینجا" ("here it means …"), which works in either position. The German block (word + book sentence) is neutral by design. The current episode could therefore be reassembled with briefings after each part without regenerating anything.
+* **Prompt change (not yet rerun):** both prompts in `episode_pipeline.py` now state it as a rule: "The app may play it before or after the part, so keep it neutral in time: say what the item means and how it is used here, never 'you will hear' or 'you just heard'."
+
+**Next step chosen by the owner:** send the prototype to a few friends and ask whether they would listen to something like this (task 0.19). Advice recorded for that test:
+
+* Send the MP3 (plays everywhere; M4B chapters mainly help in Apple Books).
+* The **automatic** version is the honest sample of local-only quality (including ~4 wrong items); the reviewed one slightly oversells it. Better still: send the result of the local-only improved run (0.15–0.18) once it exists.
+* Ask them to listen to the first 10–15 minutes, then: Did you keep listening, and would you use it for a book of your choice? Too many, too few or the right number of explanations? Before or after the part?
 
 ## 5. Findings
 
@@ -367,7 +400,7 @@ Problems found and fixed during the run:
 * **Foreign names in plain Persian text** (Gregor) are mispronounced. Fixed by vowel-marking the name only (گِرِگور); vowel-marking the whole text made Persian worse in the owner's earlier experience.
 * **Filler in the teacher's text** ("enjoy the story", plot explanations) adds length without value. (Fixed in the full run by the structured format: only word, quote and explanation.)
 * **Small local models in Persian:** `qwen3:8b` writes broken Persian; even `gemma3:12b` + review leaves about 10 % clearly wrong items.
-* **Transcription errors propagate:** the LLM taught two Whisper mistakes as German words. Without a dictionary check, only a human review catches this.
+* **Transcription errors propagate:** the LLM taught two Whisper mistakes as German words. Using the book's real text (where available) or a German word-list check removes this locally.
 * **Higgs occasionally stops speaking** after a second and fills the block with silence (~5 % of blocks, German only); a check with retry is required.
 
 ### Operational findings
@@ -431,6 +464,19 @@ The owner's concern: structured output like `{"Ungeziefer": "vermin"}` read key 
 
 This is the course-style format from 4.2.
 
+### Local models only: can the pipeline correct itself?
+
+The owner's rule: no cloud model as corrector in the final product. The 15 fixes Claude made to the automatic notes (`REVIEW_CHANGES.md`) were sorted by what could replace them locally. This is an estimate from the fix list, not yet a test.
+
+| Kind of error | Fixes | Local replacement |
+|---|---|---|
+| Whisper errors taught as words (*die Nahheiten*, *erschütternde*) | 2 | **Use the book's real text** instead of the transcript: *Die Verwandlung* is public domain (Project Gutenberg); in a product, the learner's ebook. Align text to audio per part. Without a text: a German word-list check rejects non-words |
+| Wrong article or non-dictionary form (*die Versäumnis*, *der Hindernis*, *ausstieß*, *sich verbissen*, *abhandengekommen war*) | 5 | **Lemmatizer** (e.g. spaCy German model) plus an **offline dictionary** (e.g. a Wiktionary extract) for lemma and gender. Deterministic, no LLM |
+| Errors code can catch (the "......" in a quote; *Rücksicht* taught twice in two forms; a proverb that is not in the quote; *sich scheiden* with no reflexive pronoun in the sentence; *auflösen* where the text has the adjective *aufgelöst*) | 5 | **Stricter checks:** clean quote punctuation; compare lemmas, not strings, for already-covered items; every content word of an expression must be in the quote; "sich …" items need sich/mich/dich/uns/euch in the quote; part-of-speech tag of the item in the quote must match |
+| Wrong or vague meaning, garbled Persian (*unter vier Augen*, *verhältnismäßig*, *sich einen Narren aus jemandem machen*, *aus geschäftlichen Rücksichten*, partly *abhandenkommen*) | 4–5 | **Dictionary-grounded explanation:** look the item up first and give gemma the meaning, so it only has to say it in Persian. Remaining errors: an in-app "this explanation is wrong / skip" button for the learner |
+
+Some fixes fall into two rows. **Conclusion:** about 10 of 15 fixes become reliable local data and code steps. Meaning and Persian errors will drop with grounding but not reach zero with a 12B model on 16 GB; the product handles the rest through learner feedback, not an editor. This replaces the earlier recommendation of a mandatory human review step.
+
 ### Tools and RAG (later)
 
 * `find_in_transcript(phrase)`: the LLM checks its own quote before using it.
@@ -450,7 +496,7 @@ Assembly complexity for B was judged acceptable: the script is a list of segment
 
 ## 7. Should we build it?
 
-**Recommendation after the full-episode run: yes, build it.** The technical risks are retired: a complete episode was produced automatically, locally, with a voice the owner likes and German examples Whisper confirms at a 99 % median. Build the shared core (the briefing) first, then audio input, then voice, with the safeguards from 4.5 and a human review step for the notes.
+**Recommendation after the full-episode run: yes, build it.** The technical risks are retired: a complete episode was produced automatically, locally, with a voice the owner likes and German examples Whisper confirms at a 99 % median. The owner listened and called it "really good" (4.6). Build the shared core (the briefing) first, then audio input, then voice, with the safeguards from 4.5 and the local correction steps from [section 6](#local-models-only-can-the-pipeline-correct-itself) instead of a review by a cloud model.
 
 **For:**
 
@@ -460,8 +506,8 @@ Assembly complexity for B was judged acceptable: the script is a list of segment
 
 **Against / risks:**
 
-* The full episode has not yet been used for real learning. Listening over several days (0.8) is the remaining go/no-go test.
-* Notes are not fully trustworthy without a human check (~10 % clearly wrong with the best local model). The product needs an editable review step, or a stronger model or dictionary tool.
+* The owner liked the full episode; whether others want it is untested (friends' feedback, 0.19), and real use over several days (0.8) is still open.
+* Notes are not fully trustworthy yet (~10 % clearly wrong with the best local model). The product must stay local-only, so it needs book text, lemmatizer, dictionary grounding and stricter checks (0.15–0.18), plus learner feedback in the app for what remains.
 * Voice is the most expensive part (~50 min per 41 min of audio). A **text** briefing may give much of the value at a fraction of the cost; still untested.
 * The subtitle MVP is unfinished (exports missing), and [the product overview](product.md) lists audiobook processing as an MVP non-goal. Two half-finished pipelines are a real risk; the briefing-first order reduces it.
 
@@ -480,7 +526,8 @@ timed text (from SRT or from Whisper) → sections → briefing (structured, val
 | Orchestration, jobs, API, storage | Shell + Python | **Keep Kotlin / Spring Boot / PostgreSQL** | Portfolio goal; durable job system already exists |
 | Prompt and voice experiments | Ad-hoc scripts | **Small Python lab script outside the app** | Fast iteration; only proven steps move into Subinjector |
 | LLM | qwen3:8b free text, then gemma3:12b structured | Same port ([ADR-003](adr/ADR-003-ai-provider-port-and-adapters.md)); **`gemma3:12b`, structured JSON, ~2-minute sections, 3 candidates + same-model review, code validation with quote snapping**; cloud model as an option | Measured in 4.5: best local Persian; AI output is untrusted |
-| Human review | — | **Editable notes before voicing** (a review endpoint or UI); only changed blocks are re-synthesised | ~10 % of automatic items were clearly wrong |
+| Correction of notes | Review by Claude (cloud) | **Local only:** book text instead of transcript where available, lemmatizer + offline dictionary, stricter code checks, dictionary-grounded explanations; in-app "wrong / skip" per item; only changed blocks are re-synthesised | ~10 % of automatic items were clearly wrong; owner's rule: no cloud corrector (4.6) |
+| Learner settings | Constants in the lab script | **Briefing before/after the part, items per part, detail, part length, level** as user settings | Time-neutral notes make position a pure playback choice (4.6) |
 | Speech-to-text | Voicebox `/transcribe` | **Dedicated Whisper server with timestamps** (whisper.cpp server or mlx-whisper) behind a `TranscriptionProvider` port, **with a loop/punctuation check and split-and-retry** | Timestamps are required; Voicebox issues (MP3, MLX thread bug, orphaned server); Whisper Large looped on 5 of 21 parts |
 | Text-to-speech | Voicebox `/generate`, then Higgs Audio v3 | **Higgs Audio v3 with a fixed reference clip (Serena), wrapped in a small local Python HTTP service, behind a `SpeechProvider` port** | Only tested local option that speaks Persian and German in one voice; it has no server of its own, unlike Voicebox; the port keeps Voicebox, Kokoro or a cloud provider possible |
 | Teacher voice identity | Voicebox presets | **Reference clip + transcript + seed stored as versioned configuration** | Same teacher across sessions and books |
@@ -510,8 +557,14 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 - [ ] 0.10 Small local Higgs Audio v3 HTTP service (one endpoint: text + language → WAV; fixed Serena reference clip, transcript and seed; model loaded once, unloaded when idle), so the lab script, and later Subinjector, call it like Voicebox.
 - [x] 0.11 Names in Persian blocks. **Done:** per-book spelling list applied before TTS (`PERSIAN_NAME_SPELLINGS`: Gregor → گِرِگور, Grete → گِرِته); the prompt also excludes proper names as items.
 - [ ] 0.12 Store the teacher voice definition (reference clip, transcript, seed, settings) in one versioned place. Partly done: constants in the lab script; still to move into a config file.
-- [ ] 0.13 Decide how the human review of notes works in the product (edit JSON, a small review page, or approve/reject per item), based on the 15 fixes in `REVIEW_CHANGES.md`.
+- [ ] 0.13 ~~Decide how the human review of notes works in the product~~ **Changed (4.6):** no cloud or editorial review in the product. Instead: design the in-app "this item is wrong / skip" feedback, and measure how many of the 15 fixes in `REVIEW_CHANGES.md` the local steps 0.15–0.18 reproduce.
 - [ ] 0.14 Shorten quotes that end mid-sentence (e.g. "…imstande war, das"), so the German example always ends naturally.
+- [ ] 0.15 Use the book's real text instead of the Whisper transcript where available (Gutenberg for *Die Verwandlung*): align it to the parts, quote from it. Fallback without a text: German word-list check on chosen items.
+- [ ] 0.16 Lemmatizer + offline dictionary (e.g. spaCy German + a Wiktionary extract): dictionary form and article by code; covered-items check on lemmas.
+- [ ] 0.17 Stricter item-in-quote checks: all content words of an expression, reflexive pronoun for "sich …" items, matching part of speech; strip "......" from quotes.
+- [ ] 0.18 Dictionary-grounded explanations: pass the dictionary meaning to gemma, which only writes the Persian. Then rerun notes → voice → assemble for the full episode and compare with `03_notes_reviewed/` (the quality target).
+- [ ] 0.19 **Friends' feedback:** send the prototype MP3 (ideally from the 0.18 run) to a few Persian-speaking German learners; ask the three questions in 4.6.
+- [x] 0.20 Time-neutral notes. **Done in the prompts** (4.6); the existing notes are already neutral, so before/after only changes the assembly order. Takes effect on the next notes run.
 - [ ] **Go / no-go decision**, recorded as an ADR that updates the product scope.
 
 ### Phase 1 — Text briefing in Subinjector (useful for subtitles immediately)
@@ -542,6 +595,7 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 - [ ] `lookup_word` dictionary tool for grammar facts; `find_in_transcript` tool.
 - [ ] Narrator pronunciation clips using word timestamps (option C).
 - [ ] Cloud LLM option for higher accuracy (no silent fallback, per ADR-003).
+- [ ] Learner app (owner's wish list, 4.6): player with the transcript visible (per part first, per sentence once timestamps exist), note taking, a vault for saved words and idioms with Anki export, settings for briefing position, detail, items per part and level.
 - [ ] Reconsider roadmap order: Phase 1 here is useful even if voice is dropped and could come before multi-user and sharing.
 
 ## 10. Open questions
@@ -549,12 +603,14 @@ Each item follows the project workflow: decision (ADR only if real), small spec,
 * Is a spoken briefing clearly better than a written one for this learner? (Phase 0.8)
 * What section length works best for the learner, and for the LLM?
 * How many items per section before the briefing becomes too long to remember?
-* Is `gemma3:12b` accurate enough? Partly answered: ~35 of 41 items good; the rest needs a human review, a dictionary tool or a stronger (cloud) model. Which of these is the product default?
+* Is `gemma3:12b` accurate enough? Partly answered: ~35 of 41 items good. A cloud model is ruled out as corrector (4.6); how far do local data and checks (0.15–0.18) close the gap?
 * Which teacher voice and tone does the learner want to hear every day?
 * Should the German example use the TTS voice or the narrator's own audio?
 * Can the TTS speed on an M1 (~5× slower than real time) be accepted for whole books, or does synthesis need a faster engine or a cloud provider?
 * Can a local model write natural, correct spoken Persian? Answered: `qwen3:8b` no; `gemma3:12b` with a review step mostly yes (4.5).
-* Can transcription errors be caught before the LLM teaches them, e.g. with a German word list check on chosen items?
+* Can transcription errors be caught before the LLM teaches them? Proposed: use the book's text where available, else a German word-list check (0.15).
+* Do other learners want this? (0.19)
+* Briefing before or after the part: which do learners prefer, or should it stay a setting?
 * Does the teacher language become a per-user setting (Persian, English, …), and does the briefing prompt need one version per teacher language?
 * What licence terms apply to Higgs Audio v3 and to cloning Qwen preset voice output, if the project is ever shared or deployed for others?
 
